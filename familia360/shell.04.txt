@@ -1,0 +1,82 @@
+><strong>Clima:</strong> usa a cidade que você escolhe. Não depende do GPS.</p>
+        <p><strong>Localização:</strong> começa desligada e só é enviada após sua autorização e a permissão do navegador.</p>
+        <p><strong>Visibilidade:</strong> somente membros ativos da mesma família podem ver uma posição recente.</p>
+        <p><strong>Expiração:</strong> sem nova atualização por 30 minutos, a posição deixa de ficar visível.</p>
+        <p><strong>Desativação:</strong> ao desligar no app, a última posição é removida do banco.</p>
+        <p><strong>Histórico:</strong> este MVP não registra histórico de trajetos.</p>
+      </div>
+      <button value="cancel" class="primary" type="submit">Entendi</button>
+    </form>
+  </dialog>
+
+  <dialog id="place-dialog" class="modal">
+    <form id="place-form" class="modal-card">
+      <div class="modal-title-row"><div><p class="eyebrow">LOCAL SEGURO</p><h2 id="place-dialog-title">Novo local</h2></div><button id="close-place-btn" class="icon-btn" type="button" aria-label="Fechar">×</button></div>
+      <input id="place-id" type="hidden">
+      <input id="place-lat" type="hidden">
+      <input id="place-lon" type="hidden">
+      <label>Nome<input id="place-name" type="text" maxlength="80" required placeholder="Ex.: Casa"></label>
+      <label>Raio do local
+        <select id="place-radius">
+          <option value="75">75 m</option><option value="100">100 m</option><option value="150" selected>150 m</option><option value="250">250 m</option><option value="500">500 m</option>
+        </select>
+      </label>
+      <p id="place-coordinate-copy" class="micro">Selecione um aparelho com posição para usar como referência.</p>
+      <button id="place-use-selected-btn" class="ghost" type="button">Usar posição do membro selecionado</button>
+      <div class="modal-actions"><button id="cancel-place-btn" class="ghost" type="button">Cancelar</button><button class="primary" type="submit">Salvar local</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="member-permissions-dialog" class="modal">
+    <div class="modal-card">
+      <div class="modal-title-row"><div><p class="eyebrow">PERMISSÕES</p><h2>Permissões deste aparelho</h2></div><button id="close-member-permissions" class="icon-btn" type="button" aria-label="Fechar">×</button></div>
+      <p class="muted">Cada permissão é solicitada somente quando você toca no botão correspondente.</p>
+      <div class="permission-actions">
+        <button id="request-location-permission" class="ghost" type="button">📍 Localização</button>
+        <button id="request-camera-permission" class="ghost" type="button">📷 Câmera</button>
+        <button id="request-mic-permission" class="ghost" type="button">🎙️ Microfone</button>
+        <button id="request-notification-permission" class="ghost" type="button">🔔 Notificações</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="member-alert-dialog" class="modal">
+    <div class="modal-card alert-request-card">
+      <div id="member-request-icon" class="modal-icon">🔔</div>
+      <h2 id="member-request-title">Alerta da família</h2>
+      <p id="member-request-copy">O responsável pediu sua atenção.</p>
+      <div class="modal-actions"><button id="dismiss-alert-request" class="ghost" type="button">Agora não</button><button id="accept-alert-request" class="primary" type="button">Confirmar</button></div>
+    </div>
+  </dialog>
+
+  <dialog id="member-photo-dialog" class="modal media-capture-dialog">
+    <div class="modal-card">
+      <div class="modal-title-row"><div><p class="eyebrow">CÂMERA</p><h2>Enviar foto</h2></div><button id="close-photo-capture" class="icon-btn" type="button" aria-label="Fechar">×</button></div>
+      <p class="muted">A câmera fica visível enquanto está ativa. Confira a imagem antes de enviar.</p>
+      <video id="member-photo-preview" class="media-preview" autoplay playsinline muted></video>
+      <canvas id="member-photo-canvas" class="hidden"></canvas>
+      <div class="modal-actions"><button id="cancel-photo-capture" class="ghost" type="button">Cancelar</button><button id="capture-photo-send" class="primary" type="button">📷 Tirar foto e enviar</button></div>
+    </div>
+  </dialog>
+
+  <dialog id="member-audio-dialog" class="modal media-capture-dialog">
+    <div class="modal-card">
+      <div class="modal-title-row"><div><p class="eyebrow">MICROFONE</p><h2>Enviar áudio</h2></div><button id="close-audio-capture" class="icon-btn" type="button" aria-label="Fechar">×</button></div>
+      <p class="muted">A gravação só começa quando você tocar em “Iniciar”. Máximo de 15 segundos.</p>
+      <div id="audio-recording-status" class="recording-status">Pronto para gravar</div>
+      <div class="modal-actions"><button id="cancel-audio-capture" class="ghost" type="button">Cancelar</button><button id="start-audio-recording" class="primary" type="button">🎙️ Iniciar gravação</button><button id="stop-audio-recording" class="danger hidden" type="button">■ Parar e enviar</button></div>
+    </div>
+  </dialog>
+
+  <dialog id="master-media-dialog" class="modal master-media-dialog">
+    <div class="modal-card">
+      <div class="modal-title-row"><div><p class="eyebrow">MÍDIA CONSENTIDA</p><h2 id="master-media-title">Fotos e áudios</h2></div><button id="close-master-media" class="icon-btn" type="button" aria-label="Fechar">×</button></div>
+      <p class="muted">Somente conteúdos enviados pelo próprio membro após uma solicitação aparecem aqui.</p>
+      <div id="master-media-list" class="master-media-list"><p class="muted">Nenhuma mídia recebida.</p></div>
+    </div>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="https://cdn.jsdelivr.net/gh/diegofreitas09/pdf-link-nfc@familia360-assets/familia360/app-loader.js?v=31"></script>
+</body>
+</html>
