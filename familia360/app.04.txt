@@ -1,0 +1,133 @@
+ch(url);
+    if (!response.ok) throw new Error('Falha ao buscar cidades.');
+    const json = await response.json();
+    renderCityResults(json.results || []);
+  } catch (error) { root.textContent = errorMessage(error); }
+});
+
+function renderCityResults(results) {
+  const root = $('city-results'); root.replaceChildren();
+  if (!results.length) { const p=document.createElement('p');p.className='muted';p.textContent='Nenhuma cidade encontrada.';root.append(p);return; }
+  for (const city of results) {
+    const btn = document.createElement('button'); btn.type='button'; btn.className='city-result';
+    const strong = document.createElement('strong'); strong.textContent = city.name;
+    const span = document.createElement('span'); span.textContent = [city.admin1, city.country].filter(Boolean).join(' • ');
+    btn.append(strong, span);
+    btn.addEventListener('click', () => saveWeatherCity(city));
+    root.append(btn);
+  }
+}
+
+async function saveWeatherCity(city) {
+  try {
+    const label = [city.name, city.admin1].filter(Boolean).join(' - ');
+    const { error } = await supabase.rpc('set_weather_city', {
+      p_city: label,
+      p_latitude: city.latitude,
+      p_longitude: city.longitude,
+      p_timezone: city.timezone || null
+    });
+    if (error) throw error;
+    state.profile.weather_city = label;
+    state.profile.weather_latitude = city.latitude;
+    state.profile.weather_longitude = city.longitude;
+    state.profile.weather_timezone = city.timezone || null;
+    $('city-dialog').close();
+    await loadWeather();
+    toast('Cidade do clima atualizada.');
+  } catch (error) { toast(errorMessage(error)); }
+}
+
+async function loadWeather() {
+  const p = state.profile;
+  if (!p || !Number.isFinite(p.weather_latitude) || !Number.isFinite(p.weather_longitude)) {
+    $('weather-city').textContent = 'Escolha sua cidade';
+    $('forecast-grid').replaceChildren();
+    return;
+  }
+  $('weather-city').textContent = p.weather_city || 'Minha cidade';
+  try {
+    const url = new URL('https://api.open-meteo.com/v1/forecast');
+    url.searchParams.set('latitude', p.weather_latitude);
+    url.searchParams.set('longitude', p.weather_longitude);
+    url.searchParams.set('current', 'temperature_2m,apparent_temperature,weather_code,wind_speed_10m,precipitation');
+    url.searchParams.set('daily', 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max');
+    url.searchParams.set('forecast_days', '4');
+    url.searchParams.set('timezone', 'auto');
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('Falha ao carregar o clima.');
+    renderWeather(await response.json());
+  } catch (error) { toast(errorMessage(error)); }
+}
+
+function weatherMeta(code) {
+  if (code === 0) return ['☀️','Céu limpo'];
+  if ([1,2].includes(code)) return ['🌤️','Parcialmente nublado'];
+  if (code === 3) return ['☁️','Nublado'];
+  if ([45,48].includes(code)) return ['🌫️','Neblina'];
+  if ([51,53,55,56,57].includes(code)) return ['🌦️','Garoa'];
+  if ([61,63,65,66,67,80,81,82].includes(code)) return ['🌧️','Chuva'];
+  if ([71,73,75,77,85,86].includes(code)) return ['🌨️','Neve'];
+  if ([95,96,99].includes(code)) return ['⛈️','Trovoadas'];
+  return ['🌤️','Condições variáveis'];
+}
+
+function renderWeather(data) {
+  const c = data.current || {};
+  const [icon,label] = weatherMeta(c.weather_code);
+  const root = $('weather-current'); root.classList.remove('empty-weather'); root.replaceChildren();
+  const iconEl = document.createElement('div'); iconEl.className='weather-icon'; iconEl.textContent=icon;
+  const body = document.createElement('div');
+  const temp = document.createElement('div'); temp.className='temp'; temp.textContent=`${Math.round(c.temperature_2m ?? 0)}°`;
+  const desc = document.createElement('strong'); desc.textContent=label;
+  const metrics = document.createElement('div'); metrics.className='weather-metrics';
+  for (const text of [`Sensação ${Math.round(c.apparent_temperature ?? 0)}°`, `Vento ${Math.round(c.wind_speed_10m ?? 0)} km/h`, `Precip. ${Number(c.precipitation ?? 0).toFixed(1)} mm`]) {
+    const pill=document.createElement('span');pill.className='pill';pill.textContent=text;metrics.append(pill);
+  }
+  body.append(temp,desc,metrics);root.append(iconEl,body);
+
+  const grid=$('forecast-grid');grid.replaceChildren();
+  const daily=data.daily || {};
+  for(let i=0;i<(daily.time?.length||0);i++){
+    const card=document.createElement('div');card.className='forecast-day';
+    const date=new Date(`${daily.time[i]}T12:00:00`);
+    const day=document.createElement('strong');day.textContent=i===0?'Hoje':new Intl.DateTimeFormat('pt-BR',{weekday:'short'}).format(date);
+    const ico=document.createElement('div');ico.className='icon';ico.textContent=weatherMeta(daily.weather_code[i])[0];
+    const temps=document.createElement('span');temps.textContent=`${Math.round(daily.temperature_2m_max[i])}° / ${Math.round(daily.temperature_2m_min[i])}°`;
+    const rain=document.createElement('span');rain.className='micro';rain.textContent=`Chuva: ${daily.precipitation_probability_max[i] ?? 0}%`;
+    card.append(day,ico,temps,rain);grid.append(card);
+  }
+}
+
+$('sos-btn').addEventListener('click', async () => {
+  if (!state.family) return toast('Conecte uma família primeiro.');
+  if (!window.confirm('Enviar um alerta SOS para sua família agora?')) return;
+  try {
+    const { error } = await supabase.rpc('create_sos_alert');
+    if (error) throw error;
+    await loadAlerts();
+    toast('SOS enviado para a família.');
+  } catch (error) { toast(errorMessage(error)); }
+});
+
+async function loadAlerts() {
+  const root=$('alerts-list');
+  if (!state.family) { root.innerHTML='<p class="muted">Conecte uma família primeiro.</p>'; return; }
+  const { data, error } = await supabase.from('sos_alerts').select('id,user_id,status,created_at').eq('status','open').order('created_at',{ascending:false}).limit(20);
+  if (error) { root.textContent='Não foi possível carregar os alertas.'; return; }
+  root.replaceChildren();
+  if (!data?.length) { const p=document.createElement('p');p.className='muted';p.textContent='Nenhum alerta aberto.';root.append(p);return; }
+  const names=new Map(state.dashboard.map((m)=>[m.member_user_id,m.display_name]));
+  for(const alert of data){
+    const row=document.createElement('div');row.className='alert-item';
+    const icon=document.createElement('div');icon.className='avatar';icon.textContent='SOS';
+    const info=document.createElement('div');info.className='alert-info';
+    const strong=document.createElement('strong');strong.textContent=names.get(alert.user_id)||'Membro da família';
+    const span=document.createElement('span');span.textContent=`Enviado ${relativeTime(alert.created_at)}`;info.append(strong,span);
+    const btn=document.createElement('button');btn.type='button';btn.className='ghost small';btn.textContent='Resolver';
+    btn.addEventListener('click',()=>resolveAlert(alert.id));
+    row.append(icon,info,btn);root.append(row);
+  }
+}
+
+async function re
