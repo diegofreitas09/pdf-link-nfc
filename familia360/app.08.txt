@@ -1,0 +1,140 @@
+anges',{event:'UPDATE',schema:'public',table:'latest_locations',filter},scheduleRealtimeRefresh)
+    .subscribe();
+  const alerts=supabase.channel(`family-sos-${state.family.family_id}`)
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'sos_alerts',filter},scheduleRealtimeRefresh)
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'sos_alerts',filter},scheduleRealtimeRefresh)
+    .subscribe();
+  state.realtimeChannels.push(locations,alerts);
+  if(state.family?.my_role==='owner'){
+    const devices=supabase.channel(`family-devices-${state.family.family_id}`)
+      .on('postgres_changes',{event:'*',schema:'public',table:'user_devices',filter},scheduleRealtimeRefresh)
+      .on('postgres_changes',{event:'*',schema:'public',table:'device_locations',filter},scheduleRealtimeRefresh)
+      .on('postgres_changes',{event:'*',schema:'public',table:'family_places',filter},scheduleRealtimeRefresh)
+      .on('postgres_changes',{event:'*',schema:'public',table:'family_events',filter},scheduleRealtimeRefresh)
+      .on('postgres_changes',{event:'*',schema:'public',table:'device_alert_requests',filter},scheduleRealtimeRefresh)
+      .on('postgres_changes',{event:'INSERT',schema:'public',table:'device_media_items',filter},()=>{ scheduleRealtimeRefresh(); if ($('master-media-dialog')?.open) loadMasterMedia().catch(()=>{}); })
+      .subscribe();
+    state.realtimeChannels.push(devices);
+  } else {
+    const memberAlerts=supabase.channel(`member-alert-requests-${state.user.id}`)
+      .on('postgres_changes',{event:'INSERT',schema:'public',table:'device_alert_requests',filter:`target_user_id=eq.${state.user.id}`},()=>checkPendingAlertRequests().catch(()=>{}))
+      .on('postgres_changes',{event:'UPDATE',schema:'public',table:'device_alert_requests',filter:`target_user_id=eq.${state.user.id}`},()=>checkPendingAlertRequests().catch(()=>{}))
+      .subscribe();
+    state.realtimeChannels.push(memberAlerts);
+  }
+}
+
+document.querySelectorAll('.tab').forEach((tab)=>tab.addEventListener('click',()=>{
+  document.querySelectorAll('.tab').forEach((t)=>t.classList.toggle('active',t===tab));
+  document.querySelectorAll('.panel').forEach((p)=>p.classList.remove('active-panel'));
+  const panel=$(tab.dataset.panel);panel.classList.add('active-panel');
+  if(tab.dataset.panel==='map-panel'){ensureMap();renderMap();setTimeout(()=>state.map?.invalidateSize(),80);}
+}));
+
+$('privacy-btn').addEventListener('click',()=> $('privacy-dialog').showModal());
+
+window.addEventListener('beforeinstallprompt',(event)=>{
+  event.preventDefault();state.installPrompt=event;$('install-btn').classList.remove('hidden');
+});
+$('install-btn').addEventListener('click',async()=>{
+  if(!state.installPrompt)return;
+  state.installPrompt.prompt();await state.installPrompt.userChoice;state.installPrompt=null;$('install-btn').classList.add('hidden');
+});
+window.addEventListener('appinstalled',()=>toast('Família 360 instalado.'));
+
+window.addEventListener('pagehide',()=>stopLocalWatcher());
+bootstrap();
+
+// ===== Painel Mestre 2026 =====
+function activateMasterExperience() {
+  document.body.classList.add('master-mode');
+  $('master-experience').classList.remove('hidden');
+  $('master-family-name').textContent = state.family?.family_name || 'Minha Família';
+  $('master-profile-name').textContent = state.profile?.display_name || 'Responsável';
+  $('master-invite-code').textContent = state.family?.invite_code || '—';
+  renderMasterMembers();
+  renderMasterDevice();
+  renderMasterAlerts();
+  loadMasterPlaces().catch(() => {});
+  loadMasterActivity().catch(() => {});
+  const refreshMapSize = () => {
+    ensureMasterMap();
+    state.masterMap?.invalidateSize(true);
+    renderMasterMap();
+  };
+  requestAnimationFrame(refreshMapSize);
+  setTimeout(refreshMapSize, 250);
+  setTimeout(refreshMapSize, 900);
+}
+
+function deactivateMasterExperience() {
+  document.body.classList.remove('master-mode');
+  $('master-experience')?.classList.add('hidden');
+}
+
+async function loadMasterDevices(showFeedback = false) {
+  if (state.family?.my_role !== 'owner') return;
+  const { data, error } = await supabase.rpc('get_master_device_dashboard');
+  if (error) {
+    if (showFeedback) toast(errorMessage(error, 'Não foi possível carregar os aparelhos.'));
+    return;
+  }
+  state.masterDevices = (data || []).filter((item) => item.device_id);
+  if (!state.selectedMasterDeviceId || !state.masterDevices.some((d) => d.device_id === state.selectedMasterDeviceId)) {
+    state.selectedMasterDeviceId = state.masterDevices[0]?.device_id || null;
+  }
+  renderMasterMembers();
+  renderMasterDevice();
+  renderMasterMap();
+  await Promise.all([renderMasterAlerts(), loadMasterPlaces(), loadMasterActivity()]);
+}
+
+function getSelectedMasterDevice() {
+  return state.masterDevices.find((d) => d.device_id === state.selectedMasterDeviceId) || null;
+}
+
+function renderMasterMembers() {
+  const root = $('master-member-strip');
+  if (!root) return;
+  root.replaceChildren();
+  const onlineCount = state.masterDevices.filter((d) => d.is_online).length;
+  $('master-online-summary').textContent = state.masterDevices.length
+    ? `${onlineCount} online • ${state.masterDevices.length} aparelho${state.masterDevices.length === 1 ? '' : 's'} vinculado${state.masterDevices.length === 1 ? '' : 's'}`
+    : 'Nenhum aparelho vinculado ainda';
+
+  for (const device of state.masterDevices) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `master-person-chip${device.device_id === state.selectedMasterDeviceId ? ' active' : ''}`;
+    const av = document.createElement('span'); av.className = 'master-chip-avatar'; av.textContent = initials(device.display_name || 'M');
+    const copy = document.createElement('span'); copy.className = 'master-chip-copy';
+    const name = document.createElement('strong'); name.textContent = device.display_name || 'Membro';
+    const status = document.createElement('span'); status.className = device.is_online ? 'online' : ''; status.textContent = device.is_online ? '● Online' : relativeTime(device.last_seen_at);
+    copy.append(name, status); btn.append(av, copy);
+    btn.addEventListener('click', () => {
+      state.selectedMasterDeviceId = device.device_id;
+      renderMasterMembers(); renderMasterDevice(); renderMasterMap(true);
+    });
+    root.append(btn);
+  }
+}
+
+function permissionLabel(value) {
+  if (value === 'granted') return ['Autorizada', 'permission-ok'];
+  if (value === 'denied') return ['Negada', 'permission-off'];
+  if (value === 'prompt') return ['Aguardando', 'permission-unknown'];
+  return ['Não informado', 'permission-unknown'];
+}
+
+function setPermission(id, value) {
+  const el = $(id); if (!el) return;
+  const [label, cls] = permissionLabel(value);
+  el.textContent = label;
+  el.className = cls;
+}
+
+function renderMasterDevice() {
+  const d = getSelectedMasterDevice();
+  if (!d) {
+    $('master-device-person').textContent = 'Nenhum aparelho vinculado';
+    $('master-device-name').textConten
