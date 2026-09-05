@@ -1,0 +1,92 @@
+document.querySelectorAll('[data-quick-place]').forEach(btn=>btn.addEventListener('click',()=>openPlaceDialog(null,btn.dataset.quickPlace,btn.dataset.icon||'📍')));
+$('place-form')?.addEventListener('submit',async(event)=>{
+  event.preventDefault();
+  const lat=Number($('place-lat').value),lon=Number($('place-lon').value);
+  if(!Number.isFinite(lat)||!Number.isFinite(lon))return toast('Defina a posição do local antes de salvar.');
+  const {error}=await supabase.rpc('upsert_family_place',{
+    p_id:$('place-id').value||null,
+    p_name:$('place-name').value.trim(),
+    p_latitude:lat,p_longitude:lon,p_radius_m:Number($('place-radius').value),p_icon:$('place-dialog').dataset.icon||'📍'
+  });
+  if(error)return toast(errorMessage(error));
+  $('place-dialog')?.close();toast('Local salvo.');await loadMasterPlaces();
+});
+
+async function sendMasterDeviceRequest(type='attention'){
+  const d=getSelectedMasterDevice(); if(!d?.device_id)return toast('Selecione um aparelho vinculado.');
+  if(type==='photo' && d.camera_permission!=='granted') return toast('A câmera ainda não está autorizada neste aparelho.');
+  if(type==='audio' && d.microphone_permission!=='granted') return toast('O microfone ainda não está autorizado neste aparelho.');
+  const {error}=await supabase.rpc('create_device_request',{p_device_id:d.device_id,p_request_type:type});
+  if(error)return toast(errorMessage(error));
+  const label=type==='photo'?'Solicitação de foto':type==='audio'?'Solicitação de áudio':'Pedido de atenção';
+  toast(`${label} enviada para ${d.display_name||'o membro'}. O aparelho mostrará Aceitar/Recusar.` ,5200);
+  await Promise.all([renderMasterAlerts(),loadMasterActivity()]);
+}
+async function sendMasterAlertRequest(){ return sendMasterDeviceRequest('attention'); }
+
+async function loadMasterMedia(){
+  const d=getSelectedMasterDevice(), root=$('master-media-list'); if(!d?.device_id||!root)return;
+  root.innerHTML='<p class="muted">Carregando…</p>';
+  const {data,error}=await supabase.from('device_media_items')
+    .select('id,media_type,content_type,data_base64,duration_ms,created_at')
+    .eq('device_id',d.device_id).gt('expires_at',new Date().toISOString()).order('created_at',{ascending:false}).limit(12);
+  root.replaceChildren();
+  if(error){const p=document.createElement('p');p.className='muted';p.textContent='Não foi possível carregar as mídias.';root.append(p);return;}
+  if(!data?.length){const p=document.createElement('p');p.className='muted';p.textContent='Nenhuma foto ou áudio recebido deste aparelho.';root.append(p);return;}
+  for(const m of data){
+    const item=document.createElement('article');item.className='master-media-item';
+    if(m.media_type==='photo'){const img=document.createElement('img');img.alt='Foto enviada pelo membro';img.loading='lazy';img.src=`data:${m.content_type};base64,${m.data_base64}`;item.append(img);}
+    else {const audio=document.createElement('audio');audio.controls=true;audio.preload='metadata';audio.src=`data:${m.content_type};base64,${m.data_base64}`;item.append(audio);}
+    const meta=document.createElement('div');meta.className='master-media-meta';
+    const kind=document.createElement('span');kind.textContent=m.media_type==='photo'?'📷 Foto':'🎙️ Áudio';
+    const when=document.createElement('span');when.textContent=new Date(m.created_at).toLocaleString('pt-BR');meta.append(kind,when);item.append(meta);root.append(item);
+  }
+}
+async function openMasterMedia(){
+  const d=getSelectedMasterDevice(); if(!d?.device_id)return toast('Selecione um aparelho.');
+  $('master-media-title').textContent=`Mídia de ${d.display_name||'membro'}`;
+  $('master-media-dialog')?.showModal(); await loadMasterMedia();
+}
+
+async function generatePairingCode(){
+  const {data,error}=await supabase.rpc('create_device_pairing_code');
+  if(error)return toast(errorMessage(error));
+  const code=data?.code||'—'; $('master-pair-code').textContent=code;
+  try{await navigator.clipboard.writeText(code);toast(`Código ${code} gerado e copiado. Válido por 30 minutos.` ,5200);}
+  catch{toast(`Código de vínculo: ${code} — válido por 30 minutos.` ,5200);}
+}
+
+function switchMasterView(viewId){
+  document.querySelectorAll('.master-nav').forEach((b)=>b.classList.toggle('active',b.dataset.masterView===viewId));
+  document.querySelectorAll('.master-view').forEach((v)=>v.classList.toggle('active',v.id===viewId));
+  if(viewId==='master-map-view')setTimeout(()=>{ensureMasterMap();state.masterMap?.invalidateSize(true);renderMasterMap();},70);
+  if(viewId==='master-places-view')loadMasterPlaces().catch(()=>{});
+  if(viewId==='master-alerts-view')renderMasterAlerts().catch(()=>{});
+  if(viewId==='master-activity-view')loadMasterActivity().catch(()=>{});
+}
+
+$('master-refresh-btn')?.addEventListener('click', async () => {
+  await loadMasterDevices(true); state.masterMap?.invalidateSize(true); toast('Painel atualizado.');
+});
+$('master-focus-btn')?.addEventListener('click', () => renderMasterMap(true));
+$('master-fit-btn')?.addEventListener('click', () => renderMasterMap(false,true));
+$('master-route-btn')?.addEventListener('click', () => {
+  const d=getSelectedMasterDevice(); if (!d || !Number.isFinite(d.latitude) || !Number.isFinite(d.longitude)) return toast('Não há posição disponível para criar uma rota.');
+  const url=`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${d.latitude},${d.longitude}`)}`;
+  const w=window.open(url,'_blank','noopener,noreferrer'); if(!w) window.location.href=url;
+});
+$('master-alert-btn')?.addEventListener('click', sendMasterAlertRequest);
+$('master-photo-btn')?.addEventListener('click',()=>sendMasterDeviceRequest('photo'));
+$('master-audio-btn')?.addEventListener('click',()=>sendMasterDeviceRequest('audio'));
+$('master-media-btn')?.addEventListener('click',openMasterMedia);
+$('close-master-media')?.addEventListener('click',()=> $('master-media-dialog')?.close());
+$('master-details-toggle')?.addEventListener('click', () => $('master-device-details').classList.toggle('hidden'));
+$('master-copy-code')?.addEventListener('click', async () => {
+  if (!state.family?.invite_code) return;
+  try { await navigator.clipboard.writeText(state.family.invite_code); toast('Código da família copiado.'); }
+  catch { toast(`Código: ${state.family.invite_code}`); }
+});
+$('master-generate-pair-code')?.addEventListener('click',generatePairingCode);
+$('master-logout-btn')?.addEventListener('click',async()=>{stopDeviceRuntime();stopLocalWatcher();cleanupRealtime();await supabase.auth.signOut();});
+
+document.querySelectorAll('.master-nav').forEach((btn) => btn.addEventListener('click', () => switchMasterView(btn.dataset.masterView)));
