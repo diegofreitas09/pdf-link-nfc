@@ -1,0 +1,97 @@
+div class="master-stat"><span>🔋</span><div><strong id="master-battery">—</strong><small id="master-charging">Bateria indisponível</small></div></div>
+              <div class="master-stat"><span>🎯</span><div><strong id="master-accuracy">—</strong><small>Precisão GPS</small></div></div>
+              <div class="master-stat"><span>🕐</span><div><strong id="master-last-update">—</strong><small>Última atualização</small></div></div>
+            </div>
+
+            <div class="master-actions">
+              <button id="master-focus-btn" class="master-action primary" type="button"><span>◎</span>Focar</button>
+              <button id="master-route-btn" class="master-action" type="button"><span>↗</span>Rota</button>
+              <button id="master-alert-btn" class="master-action" type="button"><span>🔔</span>Alerta</button>
+            </div>
+            <div class="master-media-actions">
+              <button id="master-photo-btn" class="master-action" type="button"><span>📷</span>Solicitar foto</button>
+              <button id="master-audio-btn" class="master-action" type="button"><span>🎙️</span>Solicitar áudio</button>
+              <button id="master-media-btn" class="master-action" type="button"><span>🖼️</span>Mídia</button>
+            </div>
+
+            <button id="master-details-toggle" class="master-details-toggle" type="button">Ver detalhes do aparelho <span>⌄</span></button>
+            <div id="master-device-details" class="master-device-details hidden">
+              <div><span>📍 Localização</span><strong id="master-perm-location">—</strong></div>
+              <div><span>📷 Câmera</span><strong id="master-perm-camera">—</strong></div>
+              <div><span>🎙️ Microfone</span><strong id="master-perm-mic">—</strong></div>
+              <div><span>🔔 Notificações</span><strong id="master-perm-notif">—</strong></div>
+              <div><span>📱 Sistema</span><strong id="master-platform">—</strong></div>
+              <div><span>🌐 Navegador</span><strong id="master-browser">—</strong></div>
+            </div>
+          </article>
+        </section>
+
+        <section id="master-places-view" class="master-view">
+          <article class="master-dark-card">
+            <div class="master-section-head">
+              <div><p class="master-kicker">LOCAIS</p><h2>Locais importantes</h2></div>
+              <button id="master-add-place-btn" class="master-action primary compact" type="button">＋ Novo</button>
+            </div>
+            <p class="master-muted">Cadastre Casa, Escola ou outro local. O Família 360 registra chegada e saída quando o aparelho envia uma nova posição.</p>
+            <div class="place-quick-actions">
+              <button type="button" data-quick-place="Casa" data-icon="🏠">🏠 <strong>Casa</strong><span>Usar posição atual</span></button>
+              <button type="button" data-quick-place="Escola" data-icon="🏫">🏫 <strong>Escola</strong><span>Usar posição atual</span></button>
+            </div>
+            <div id="master-places-list" class="master-feed"><p class="master-muted">Carregando locais…</p></div>
+          </article>
+        </section>
+
+        <section id="master-alerts-view" class="master-view">
+          <article class="master-dark-card">
+            <p class="master-kicker">ALERTAS</p><h2>Central de segurança</h2>
+            <div id="master-alerts-list" class="master-feed"><p class="master-muted">Carregando alertas…</p></div>
+          </article>
+        </section>
+
+        <section id="master-activity-view" class="master-view">
+          <article class="master-dark-card">
+            <p class="master-kicker">ATIVIDADE</p><h2>Atividade recente</h2>
+            <div id="master-activity-list" class="master-feed"></div>
+          </article>
+        </section>
+
+        <section id="master-profile-view" class="master-view">
+          <article class="master-dark-card">
+            <p class="master-kicker">PERFIL MESTRE</p><h2 id="master-profile-name">Responsável</h2>
+            <p class="master-muted">Gerencie sua família, convites e preferências do painel.</p>
+            <div class="master-profile-row"><span>Código da família</span><strong id="master-invite-code">—</strong></div>
+            <button id="master-copy-code" class="master-action wide" type="button">Copiar código da família</button>
+            <div class="master-profile-row"><span>Código de vínculo do aparelho</span><strong id="master-pair-code">Gerar</strong></div>
+            <button id="master-generate-pair-code" class="master-action primary wide" type="button">Gerar código de vínculo</button>
+            <button id="master-logout-btn" class="master-action wide danger-master" type="button">Sair da conta</button>
+          </article>
+        </section>
+
+        <nav class="master-bottom-nav" aria-label="Navegação Mestre">
+          <button class="master-nav active" data-master-view="master-map-view" type="button"><span>⌖</span>Mapa</button>
+          <button class="master-nav" data-master-view="master-places-view" type="button"><span>⌂</span>Locais</button>
+          <button class="master-nav" data-master-view="master-alerts-view" type="button"><span>◉</span>Alertas</button>
+          <button class="master-nav" data-master-view="master-activity-view" type="button"><span>≋</span>Atividade</button>
+          <button class="master-nav" data-master-view="master-profile-view" type="button"><span>●</span>Perfil</button>
+        </nav>
+      </section>
+
+      <section id="family-onboarding" class="card hidden">
+        <p class="eyebrow">PRIMEIRO ACESSO</p>
+        <h2>Conecte sua família</h2>
+        <p class="muted">Crie um grupo novo ou entre com o código enviado por alguém da sua família.</p>
+        <div class="two-cols">
+          <form id="create-family-form" class="stack inset">
+            <h3>Criar família</h3>
+            <label>Nome da família<input id="family-name" type="text" minlength="2" maxlength="80" placeholder="Ex.: Família Freitas" required></label>
+            <button class="primary" type="submit">Criar</button>
+          </form>
+          <form id="join-family-form" class="stack inset">
+            <h3>Entrar com código</h3>
+            <label>Código de 8 caracteres<input id="invite-code-input" type="text" minlength="8" maxlength="8" autocomplete="off" placeholder="A1B2C3D4" required></label>
+            <button class="secondary" type="submit">Entrar</button>
+          </form>
+        </div>
+      </section>
+
+      <nav class="bottom-tabs" aria-label="Navegação pri
