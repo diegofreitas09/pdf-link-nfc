@@ -1,0 +1,111 @@
+ const span=document.createElement('span');
+    if (entry.kind === 'sos') {
+      icon.textContent='🆘'; strong.textContent=names.get(entry.data.user_id)||'Membro da família';
+      span.textContent=`SOS aberto ${relativeTime(entry.data.created_at)}`;
+      const btn=document.createElement('button'); btn.className='feed-mini-btn'; btn.type='button'; btn.textContent='Resolver';
+      btn.addEventListener('click', async()=>{
+        const {error}=await supabase.rpc('resolve_sos_alert',{p_alert_id:entry.data.id});
+        if(error) return toast(errorMessage(error));
+        toast('SOS resolvido.'); await renderMasterAlerts();
+      });
+      copy.append(strong,span); item.append(icon,copy,btn);
+    } else {
+      const type=entry.data.request_type||'attention';
+      icon.textContent=type==='photo'?'📷':type==='audio'?'🎙️':'🔔'; strong.textContent=names.get(entry.data.target_user_id)||'Membro';
+      const label=type==='photo'?'Solicitação de foto':type==='audio'?'Solicitação de áudio':'Pedido de atenção';
+      span.textContent=`${label} • ${alertStatusLabel(entry.data.status)} • ${relativeTime(entry.data.created_at)}`;
+      copy.append(strong,span); item.append(icon,copy);
+    }
+    root.append(item);
+  }
+}
+
+function eventIcon(type) {
+  return ({arrival:'🏠',departure:'🚶',alert_requested:'🔔',alert_acknowledged:'✅',alert_dismissed:'↩️',sos:'🆘',photo_requested:'📷',photo_received:'🖼️',audio_requested:'🎙️',audio_received:'🔊'})[type] || '•';
+}
+
+async function loadMasterActivity() {
+  const root=$('master-activity-list'); if (!root || state.family?.my_role!=='owner') return;
+  const {data,error}=await supabase.rpc('get_family_activity',{p_limit:60});
+  state.masterActivity=data||[];
+  root.replaceChildren();
+  if(error){const p=document.createElement('p');p.className='master-muted';p.textContent='Não foi possível carregar a atividade.';root.append(p);return;}
+  if(!state.masterActivity.length){
+    const p=document.createElement('p');p.className='master-muted';p.textContent='Nenhum evento registrado ainda. Chegadas, saídas e alertas aparecerão aqui.';root.append(p);return;
+  }
+  for(const e of state.masterActivity){
+    const item=document.createElement('div');item.className='master-feed-item';
+    const icon=document.createElement('div');icon.className='master-feed-icon';icon.textContent=eventIcon(e.event_type);
+    const copy=document.createElement('div');copy.className='master-feed-copy';
+    const strong=document.createElement('strong');strong.textContent=e.message||'Atividade da família';
+    const span=document.createElement('span');span.textContent=relativeTime(e.created_at);
+    copy.append(strong,span);item.append(icon,copy);root.append(item);
+  }
+}
+
+async function loadMasterPlaces() {
+  const root=$('master-places-list'); if(!root || state.family?.my_role!=='owner') return;
+  const {data,error}=await supabase.rpc('get_family_places');
+  state.masterPlaces=data||[];
+  renderMasterPlaces(error);
+}
+
+function renderMasterPlaces(error=null){
+  const root=$('master-places-list'); if(!root) return;
+  root.replaceChildren();
+  if(error){const p=document.createElement('p');p.className='master-muted';p.textContent='Não foi possível carregar os locais.';root.append(p);return;}
+  if(!state.masterPlaces.length){const p=document.createElement('p');p.className='master-muted';p.textContent='Nenhum local configurado. Use Casa, Escola ou + Novo.';root.append(p);return;}
+  for(const place of state.masterPlaces){
+    const item=document.createElement('div'); item.className='master-place-item';
+    const lead=document.createElement('div'); lead.className='master-place-lead';
+    const ico=document.createElement('span'); ico.className='place-icon'; ico.textContent=place.icon||'📍';
+    const copy=document.createElement('div'); const strong=document.createElement('strong');strong.textContent=place.name;
+    const meta=document.createElement('span');meta.textContent=`Raio ${place.radius_m} m`;copy.append(strong,meta);lead.append(ico,copy);
+    const actions=document.createElement('div');actions.className='place-item-actions';
+    const focus=document.createElement('button');focus.type='button';focus.className='feed-mini-btn';focus.textContent='Mapa';focus.addEventListener('click',()=>{
+      switchMasterView('master-map-view'); const map=ensureMasterMap(); map?.flyTo([place.latitude,place.longitude],17,{duration:.5});
+      const circle=L.circle([place.latitude,place.longitude],{radius:place.radius_m,weight:2,fillOpacity:.08}).addTo(map); state.masterLayers.push(circle);
+    });
+    const edit=document.createElement('button');edit.type='button';edit.className='feed-mini-btn';edit.textContent='Editar';edit.addEventListener('click',()=>openPlaceDialog(place));
+    const del=document.createElement('button');del.type='button';del.className='feed-mini-btn danger-mini';del.textContent='Excluir';del.addEventListener('click',async()=>{
+      if(!window.confirm(`Excluir o local ${place.name}?`)) return;
+      const {error}=await supabase.rpc('delete_family_place',{p_id:place.id}); if(error)return toast(errorMessage(error));
+      toast('Local excluído.'); await loadMasterPlaces();
+    });
+    actions.append(focus,edit,del); item.append(lead,actions); root.append(item);
+  }
+}
+
+function selectedPosition(){
+  const d=getSelectedMasterDevice();
+  return d && Number.isFinite(d.latitude) && Number.isFinite(d.longitude) ? {lat:d.latitude,lon:d.longitude,name:d.display_name||'membro'} : null;
+}
+
+function openPlaceDialog(place=null, quickName=null, quickIcon='📍'){
+  const pos=place ? {lat:place.latitude,lon:place.longitude,name:'local salvo'} : selectedPosition();
+  $('place-id').value=place?.id||'';
+  $('place-name').value=place?.name||quickName||'';
+  $('place-radius').value=String(place?.radius_m||150);
+  $('place-lat').value=pos?.lat ?? '';
+  $('place-lon').value=pos?.lon ?? '';
+  $('place-dialog-title').textContent=place?'Editar local':'Novo local';
+  $('place-dialog').dataset.icon=place?.icon||quickIcon||'📍';
+  updatePlaceCoordinateCopy();
+  $('place-dialog')?.showModal();
+}
+
+function updatePlaceCoordinateCopy(){
+  const lat=Number($('place-lat').value),lon=Number($('place-lon').value);
+  $('place-coordinate-copy').textContent=Number.isFinite(lat)&&Number.isFinite(lon)
+    ? `Referência: ${lat.toFixed(5)}, ${lon.toFixed(5)}. O raio será aplicado ao redor deste ponto.`
+    : 'Selecione um membro com uma posição disponível para usar como referência.';
+}
+
+$('place-use-selected-btn')?.addEventListener('click',()=>{
+  const pos=selectedPosition(); if(!pos)return toast('O membro selecionado ainda não tem uma posição disponível.');
+  $('place-lat').value=pos.lat; $('place-lon').value=pos.lon; updatePlaceCoordinateCopy();
+  toast(`Usando a última posição de ${pos.name}.`);
+});
+$('close-place-btn')?.addEventListener('click',()=> $('place-dialog')?.close());
+$('cancel-place-btn')?.addEventListener('click',()=> $('place-dialog')?.close());
+$('master-add-place-btn')?.addEventListener('click',()=>openPlaceDialog());
