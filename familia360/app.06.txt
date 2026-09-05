@@ -1,0 +1,134 @@
+erCase();
+  if (code.length !== 8) return toast('Digite o código de vínculo de 8 caracteres.');
+  try {
+    const key = state.deviceKey || localStorage.getItem('familia360_device_key') || createDeviceKey();
+    state.deviceKey = key;
+    localStorage.setItem('familia360_device_key', key);
+    const { error } = await supabase.rpc('pair_my_device', {
+      p_code: code,
+      p_device_key: key,
+      p_device_name: detectPlatform() === 'Android' ? 'Celular Android' : 'Meu aparelho',
+      p_platform: detectPlatform(),
+      p_browser: detectBrowser(),
+      p_app_version: '3.1.0',
+      p_install_mode: detectInstallMode()
+    });
+    if (error) throw error;
+    await loadFamilySettings();
+    await refreshFamilyData(false);
+    await initializeMemberDevice();
+    setupRealtime();
+    toast('Aparelho vinculado ao Mestre.');
+  } catch (error) { toast(errorMessage(error)); }
+});
+
+$('member-permissions-btn')?.addEventListener('click', () => $('member-permissions-dialog')?.showModal());
+$('close-member-permissions')?.addEventListener('click', () => $('member-permissions-dialog')?.close());
+$('request-location-permission')?.addEventListener('click', async () => {
+  if (!navigator.geolocation) return toast('Geolocalização indisponível neste navegador.');
+  navigator.geolocation.getCurrentPosition(async () => {
+    await updateDevicePermissionState({ location: 'granted' }).catch(() => {});
+    toast('Localização autorizada. O compartilhamento continua sob seu controle.');
+  }, async (err) => {
+    if (err.code === 1) await updateDevicePermissionState({ location: 'denied' }).catch(() => {});
+    toast('Permissão de localização não concedida.');
+  }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+});
+$('request-camera-permission')?.addEventListener('click', async () => {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+    stream.getTracks().forEach((t) => t.stop());
+    await updateDevicePermissionState({ camera: 'granted' });
+    toast('Câmera autorizada. Nenhuma imagem foi gravada.');
+  } catch { await updateDevicePermissionState({ camera: 'denied' }).catch(() => {}); toast('Permissão de câmera não concedida.'); }
+});
+$('request-mic-permission')?.addEventListener('click', async () => {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
+    stream.getTracks().forEach((t) => t.stop());
+    await updateDevicePermissionState({ microphone: 'granted' });
+    toast('Microfone autorizado. Nenhum áudio foi gravado.');
+  } catch { await updateDevicePermissionState({ microphone: 'denied' }).catch(() => {}); toast('Permissão de microfone não concedida.'); }
+});
+$('request-notification-permission')?.addEventListener('click', async () => {
+  if (!('Notification' in window)) return toast('Notificações não são suportadas neste navegador.');
+  const result = await Notification.requestPermission();
+  await updateDevicePermissionState({ notifications: result === 'granted' ? 'granted' : 'denied' }).catch(() => {});
+  toast(result === 'granted' ? 'Notificações autorizadas.' : 'Notificações não autorizadas.');
+});
+
+$('member-sos-btn')?.addEventListener('click', async () => {
+  if (!state.family) return toast('Vincule este aparelho à família primeiro.');
+  if (!window.confirm('Enviar um SOS para sua família agora?')) return;
+  const { error } = await supabase.rpc('create_sos_alert');
+  if (error) return toast(errorMessage(error));
+  toast('SOS enviado.');
+});
+
+function startPendingAlertChecks() {
+  if (state.pendingAlertTimer) clearInterval(state.pendingAlertTimer);
+  checkPendingAlertRequests().catch(() => {});
+  state.pendingAlertTimer = setInterval(() => checkPendingAlertRequests().catch(() => {}), 10000);
+}
+
+async function checkPendingAlertRequests() {
+  if (!state.user || state.family?.my_role === 'owner' || state.activeMediaRequest) return;
+  const { data, error } = await supabase.rpc('get_my_pending_device_requests');
+  if (error || !data?.length) return;
+  const next = data[0];
+  if (state.pendingAlertRequest?.id === next.id && $('member-alert-dialog')?.open) return;
+  state.pendingAlertRequest = next;
+  const type = next.request_type || 'attention';
+  const copy = {
+    attention: { icon:'🔔', title:'Alerta da família', text:'O responsável pediu sua atenção. O som só será reproduzido se você confirmar.', action:'Tocar alerta' },
+    photo: { icon:'📷', title:'Solicitação de foto', text:'O responsável solicitou uma foto. A câmera só será aberta se você aceitar; você verá a prévia antes de enviar.', action:'Abrir câmera' },
+    audio: { icon:'🎙️', title:'Solicitação de áudio', text:'O responsável solicitou um áudio curto. O microfone só será ativado se você aceitar e iniciar a gravação.', action:'Abrir gravador' }
+  }[type] || { icon:'🔔', title:'Pedido da família', text:'Há uma solicitação aguardando sua confirmação.', action:'Confirmar' };
+  $('member-request-icon').textContent = copy.icon;
+  $('member-request-title').textContent = copy.title;
+  $('member-request-copy').textContent = copy.text;
+  $('accept-alert-request').textContent = copy.action;
+  if ('Notification' in window && Notification.permission === 'granted' && document.visibilityState === 'hidden') {
+    try { new Notification('Família 360', { body: copy.title }); } catch {}
+  }
+  if (!$('member-alert-dialog')?.open) $('member-alert-dialog')?.showModal();
+}
+
+function playConsentAlertSound() {
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  if (!AudioCtx) return;
+  const ctx = new AudioCtx();
+  const start = ctx.currentTime;
+  [0, .45, .9, 1.35].forEach((offset, i) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine'; osc.frequency.value = i % 2 ? 740 : 880;
+    gain.gain.setValueAtTime(0.0001, start + offset);
+    gain.gain.exponentialRampToValueAtTime(0.22, start + offset + .02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + offset + .32);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(start + offset); osc.stop(start + offset + .34);
+  });
+  setTimeout(() => ctx.close().catch?.(() => {}), 2500);
+}
+
+function stopActiveMediaStream() {
+  try { state.mediaRecorder?.state !== 'inactive' && state.mediaRecorder?.stop(); } catch {}
+  state.mediaRecorder = null;
+  for (const track of state.activeMediaStream?.getTracks?.() || []) track.stop();
+  state.activeMediaStream = null;
+  const video = $('member-photo-preview'); if (video) video.srcObject = null;
+}
+
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(String(reader.result || '').split(',')[1] || '');
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function dismissCurrentMediaRequest() {
+  const req = state.activeMediaRequest || state.pendingAlertRequest;
+  if (req?.id) await supabase.rpc('dismiss_device_request', { p_request_id: req.id }).catch?.(() 
