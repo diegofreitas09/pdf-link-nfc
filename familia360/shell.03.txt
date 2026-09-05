@@ -1,0 +1,120 @@
+ncipal">
+        <button class="tab active" data-panel="home-panel" type="button"><span>☀️</span>Início</button>
+        <button class="tab" data-panel="family-panel" type="button"><span>👨‍👩‍👧</span>Família</button>
+        <button class="tab" data-panel="map-panel" type="button"><span>🗺️</span>Mapa</button>
+        <button class="tab" data-panel="safety-panel" type="button"><span>🛟</span>Segurança</button>
+      </nav>
+
+      <div class="content">
+        <section id="home-panel" class="panel active-panel">
+          <article class="weather-hero card">
+            <div class="weather-head">
+              <div><p class="eyebrow">TEMPO AGORA</p><h2 id="weather-city">Escolha sua cidade</h2></div>
+              <button id="choose-city-btn" class="ghost" type="button">Alterar cidade</button>
+            </div>
+            <div id="weather-current" class="weather-current empty-weather">
+              <div class="weather-icon">🌤️</div>
+              <div><strong>Clima independente do GPS</strong><p>Escolha uma cidade para ver a previsão.</p></div>
+            </div>
+            <div id="forecast-grid" class="forecast-grid"></div>
+          </article>
+
+          <div class="two-cols">
+            <article class="card">
+              <p class="eyebrow">LOCALIZAÇÃO</p>
+              <h2>Compartilhar comigo no controle</h2>
+              <p class="muted">Sua posição só é enviada depois da sua autorização e apenas para membros ativos da sua família.</p>
+              <div class="action-row">
+                <button id="share-location-btn" class="primary" type="button">Ativar compartilhamento</button>
+                <button id="disable-share-btn" class="danger-outline hidden" type="button">Desativar</button>
+              </div>
+              <p id="location-note" class="micro">Desligado por padrão.</p>
+            </article>
+
+            <article class="card">
+              <p class="eyebrow">FAMÍLIA</p>
+              <h2 id="family-summary-title">Nenhuma família conectada</h2>
+              <p id="family-summary-text" class="muted">Crie ou entre em uma família para usar mapa e SOS.</p>
+              <div id="invite-card" class="invite-card hidden">
+                <span>Seu código de convite</span>
+                <strong id="invite-code">—</strong>
+                <button id="copy-invite-btn" class="ghost small" type="button">Copiar</button>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section id="family-panel" class="panel">
+          <article class="card">
+            <p class="eyebrow">MEU GRUPO</p>
+            <h2 id="family-name-title">Família</h2>
+            <div id="members-list" class="members-list"><p class="muted">Nenhum membro carregado.</p></div>
+          </article>
+        </section>
+
+        <section id="map-panel" class="panel">
+          <article class="card map-card">
+            <div class="weather-head">
+              <div><p class="eyebrow">MAPA FAMILIAR</p><h2>Quem está compartilhando agora</h2></div>
+              <button id="refresh-map-btn" class="ghost" type="button">Atualizar</button>
+            </div>
+            <p class="micro">Posições sem atualização por 30 minutos deixam de ficar visíveis automaticamente.</p>
+            <div id="map" aria-label="Mapa das localizações compartilhadas"></div>
+            <p id="map-empty" class="map-empty">Nenhum membro com localização recente.</p>
+          </article>
+        </section>
+
+        <section id="safety-panel" class="panel">
+          <div class="two-cols">
+            <article class="card sos-card">
+              <p class="eyebrow">PEDIR AJUDA</p>
+              <h2>SOS familiar</h2>
+              <p class="muted">Envia um alerta para os membros da sua família. Use somente quando precisar chamar a atenção deles.</p>
+              <button id="sos-btn" class="danger" type="button">Enviar SOS</button>
+            </article>
+            <article class="card">
+              <p class="eyebrow">ALERTAS ABERTOS</p>
+              <div id="alerts-list" class="alerts-list"><p class="muted">Nenhum alerta aberto.</p></div>
+            </article>
+          </div>
+          <article class="card privacy-card">
+            <p class="eyebrow">PRIVACIDADE</p>
+            <h2>Você decide o que compartilhar</h2>
+            <p>O clima usa a cidade escolhida manualmente. O GPS fica desligado por padrão. Desativar o compartilhamento remove a última posição armazenada. O MVP não mantém histórico de trajetos.</p>
+            <button id="privacy-btn" class="ghost" type="button">Ver detalhes</button>
+          </article>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="location-consent" class="modal">
+    <form method="dialog" class="modal-card">
+      <div class="modal-icon">📍</div>
+      <h2>Compartilhar sua localização?</h2>
+      <p>Ao ativar, este aparelho enviará sua posição enquanto o aplicativo estiver aberto e o navegador permitir. Somente membros ativos da sua família poderão ver uma posição recente.</p>
+      <ul>
+        <li>Você pode desativar a qualquer momento.</li>
+        <li>Ao desativar, a última posição armazenada é apagada.</li>
+        <li>Sem atualização por 30 minutos, sua posição deixa de ficar visível.</li>
+      </ul>
+      <div class="modal-actions">
+        <button value="cancel" class="ghost" type="submit">Agora não</button>
+        <button id="confirm-location-btn" value="default" class="primary" type="button">Ativar e permitir</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="city-dialog" class="modal">
+    <div class="modal-card">
+      <div class="modal-title-row"><div><p class="eyebrow">CLIMA</p><h2>Escolher cidade</h2></div><button id="close-city-btn" class="icon-btn" type="button" aria-label="Fechar">×</button></div>
+      <form id="city-search-form" class="city-search"><input id="city-search-input" type="search" minlength="2" placeholder="Digite uma cidade" required><button class="primary" type="submit">Buscar</button></form>
+      <div id="city-results" class="city-results"><p class="muted">Digite o nome da cidade. Isso não ativa seu GPS.</p></div>
+    </div>
+  </dialog>
+
+  <dialog id="privacy-dialog" class="modal">
+    <form method="dialog" class="modal-card">
+      <div class="modal-title-row"><div><p class="eyebrow">PRIVACIDADE</p><h2>Como o Família 360 trata a localização</h2></div><button value="cancel" class="icon-btn" type="submit" aria-label="Fechar">×</button></div>
+      <div class="privacy-copy">
+        <p
