@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#176B87">
+  <meta name="description" content="Família 360 — segurança familiar, locais, alertas e localização compartilhada com consentimento.">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' blob: https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data: blob: https://*.tile.openstreetmap.org; connect-src 'self' https://cdn.jsdelivr.net https://kevillefdybgadutiypo.supabase.co wss://kevillefdybgadutiypo.supabase.co https://api.open-meteo.com https://geocoding-api.open-meteo.com; font-src 'self'; media-src 'self' data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
+  <script src="https://cdn.jsdelivr.net/gh/diegofreitas09/pdf-link-nfc@familia360-assets/familia360/style-loader.js?v=31"></script>
+  <title>Família 360</title>
+</head>
+<body>
+  <main class="shell">
+    <section id="auth-screen" class="auth-screen">
+      <div class="brand-card">
+        <div class="brand-mark" aria-hidden="true">360°</div>
+        <div>
+          <p class="eyebrow">CLIMA • FAMÍLIA • SEGURANÇA</p>
+          <h1>Família 360</h1>
+          <p class="muted">Previsão do tempo, conexão familiar e localização compartilhada somente quando você autorizar.</p>
+        </div>
+      </div>
+
+      <div class="auth-card">
+        <div class="segmented" role="tablist" aria-label="Acesso">
+          <button id="show-login" class="segmented-active" type="button">Entrar</button>
+          <button id="show-signup" type="button">Criar conta</button>
+        </div>
+
+        <form id="login-form" class="stack">
+          <label>E-mail<input id="login-email" type="email" autocomplete="email" required></label>
+          <label>Senha<input id="login-password" type="password" autocomplete="current-password" minlength="6" required></label>
+          <button class="primary" type="submit">Entrar</button>
+        </form>
+
+        <form id="signup-form" class="stack hidden">
+          <label>Seu nome<input id="signup-name" type="text" maxlength="80" autocomplete="name" required></label>
+          <label>E-mail<input id="signup-email" type="email" autocomplete="email" required></label>
+          <label>Senha<input id="signup-password" type="password" autocomplete="new-password" minlength="6" required></label>
+          <p class="micro">A localização começa desligada. Você decide se e quando quer compartilhar.</p>
+          <button class="primary" type="submit">Criar conta</button>
+        </form>
+        <p id="auth-message" class="message" aria-live="polite"></p>
+      </div>
+    </section>
+
+    <section id="app-screen" class="hidden">
+      <header class="topbar">
+        <div class="topbar-brand">
+          <div class="mini-mark">360°</div>
+          <div><strong>Família 360</strong><span id="welcome-name">Olá</span></div>
+        </div>
+        <div class="top-actions">
+          <button id="install-btn" class="ghost small hidden" type="button">Instalar</button>
+          <button id="logout-btn" class="ghost small" type="button">Sair</button>
+        </div>
+      </header>
+
+      <div id="sharing-banner" class="sharing-banner off" role="status">
+        <span class="status-dot"></span>
+        <div><strong id="sharing-title">Localização desligada</strong><span id="sharing-detail">Este aparelho não está enviando sua posição.</span></div>
+      </div>
+
+      <section id="member-device-card" class="card member-device-card hidden">
+        <div class="weather-head">
+          <div><p class="eyebrow">ESTE APARELHO</p><h2 id="member-device-title">Celular</h2></div>
+          <span id="member-device-status" class="device-status-pill">Preparando…</span>
+        </div>
+        <p id="member-device-copy" class="muted">O aparelho só envia localização quando você ativa o compartilhamento.</p>
+        <form id="pair-device-form" class="pair-device-row hidden">
+          <input id="pair-device-code" type="text" minlength="8" maxlength="8" autocomplete="off" placeholder="Código de vínculo" aria-label="Código de vínculo">
+          <button class="primary" type="submit">Vincular</button>
+        </form>
+        <div class="member-device-actions">
+          <button id="member-permissions-btn" class="ghost" type="button">Permissões</button>
+          <button id="member-sos-btn" class="danger-outline" type="button">SOS</button>
+        </div>
+      </section>
+
+      <section id="master-experience" class="master-experience hidden" aria-label="Painel Mestre Família 360">
+        <header class="master-header">
+          <div>
+            <p class="master-kicker">FAMÍLIA 360 · MESTRE</p>
+            <h1 id="master-family-name">Minha Família</h1>
+            <p id="master-online-summary" class="master-subtitle">Carregando aparelhos…</p>
+          </div>
+          <button id="master-refresh-btn" class="master-icon-btn" type="button" aria-label="Atualizar">↻</button>
+        </header>
+
+        <div id="master-member-strip" class="master-member-strip" aria-label="Membros vinculados"></div>
+
+        <section id="master-map-view" class="master-view active">
+          <div class="master-map-wrap">
+            <div id="master-map" aria-label="Mapa dos aparelhos vinculados"></div>
+            <div class="master-map-controls">
+              <button class="master-map-chip active" type="button">Mapa</button>
+              <button id="master-fit-btn" class="master-map-chip" type="button">Todos</button>
+            </div>
+            <div id="master-map-empty" class="master-map-empty hidden">Nenhuma posição recente disponível.</div>
+          </div>
+
+          <article id="master-device-sheet" class="master-device-sheet">
+            <div class="sheet-handle"></div>
+            <div class="master-device-head">
+              <div class="master-device-avatar" id="master-device-avatar">F</div>
+              <div class="master-device-title">
+                <h2 id="master-device-person">Selecione um membro</h2>
+                <p id="master-device-name">Nenhum aparelho selecionado</p>
+              </div>
+              <span id="master-device-online" class="master-online-badge off">Offline</span>
+            </div>
+
+            <div class="master-primary-stats">
+              <
