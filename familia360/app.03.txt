@@ -1,0 +1,152 @@
+
+  mainBtn.disabled = !hasFamily;
+  disableBtn.classList.add('hidden');
+  banner.classList.remove('on','off','paused');
+
+  if (state.watchId !== null) {
+    banner.classList.add('on'); title.textContent = 'Compartilhando localização'; detail.textContent = 'Este aparelho está enviando sua posição para a família.';
+    mainBtn.textContent = 'Parar compartilhamento'; note.textContent = 'Você pode desligar a qualquer momento.';
+    return;
+  }
+  if (state.profile?.location_sharing_enabled) {
+    banner.classList.add('paused'); title.textContent = 'Compartilhamento pausado neste aparelho'; detail.textContent = 'Nenhuma nova posição está sendo enviada agora.';
+    mainBtn.textContent = 'Retomar neste aparelho'; disableBtn.classList.remove('hidden'); note.textContent = 'Uma posição antiga deixa de ficar visível após 30 minutos.';
+    return;
+  }
+  banner.classList.add('off'); title.textContent = 'Localização desligada'; detail.textContent = 'Este aparelho não está enviando sua posição.';
+  mainBtn.textContent = 'Ativar compartilhamento'; note.textContent = hasFamily ? 'Desligado por padrão.' : 'Conecte uma família primeiro.';
+}
+
+$('share-location-btn').addEventListener('click', () => {
+  if (!state.family) return toast('Conecte uma família primeiro.');
+  if (state.watchId !== null) return disableLocationSharing();
+  $('location-consent').showModal();
+});
+$('disable-share-btn').addEventListener('click', () => disableLocationSharing());
+$('confirm-location-btn').addEventListener('click', async () => {
+  $('location-consent').close();
+  await startLocationSharing();
+});
+
+async function startLocationSharing() {
+  if (!navigator.geolocation) return toast('Este navegador não oferece geolocalização.');
+  try {
+    const first = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, {
+      enableHighAccuracy: true, timeout: 20000, maximumAge: 5000
+    }));
+
+    if (state.myDevice && state.deviceKey) {
+      await updateDevicePermissionState({ location: 'granted' });
+      const { error: sharingError } = await supabase.rpc('set_my_device_location_sharing', {
+        p_device_key: state.deviceKey,
+        p_enabled: true
+      });
+      if (sharingError) throw sharingError;
+    } else {
+      const { error: sharingError } = await supabase.rpc('set_location_sharing', { p_enabled: true });
+      if (sharingError) throw sharingError;
+    }
+
+    if (state.profile) state.profile.location_sharing_enabled = true;
+    await sendLocation(first, true);
+    state.watchId = navigator.geolocation.watchPosition((position) => {
+      sendLocation(position).catch(() => {});
+    }, async (geoError) => {
+      if (geoError.code === 1) {
+        if (state.myDevice) await updateDevicePermissionState({ location: 'denied' }).catch(() => {});
+        await disableLocationSharing();
+        toast('Permissão de localização removida. Compartilhamento desligado.');
+      }
+    }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 10000 });
+    renderSharingState();
+    await refreshFamilyData(false);
+    if (state.family?.my_role === 'member') await refreshMemberDeviceCard();
+    toast('Localização ativada neste aparelho.');
+  } catch (error) {
+    try {
+      if (state.myDevice && state.deviceKey) {
+        await supabase.rpc('set_my_device_location_sharing', { p_device_key: state.deviceKey, p_enabled: false });
+      } else {
+        await supabase.rpc('set_location_sharing', { p_enabled: false });
+      }
+    } catch {}
+    if (state.profile) state.profile.location_sharing_enabled = false;
+    stopLocalWatcher(); renderSharingState();
+    toast(error?.code === 1 ? 'Você não permitiu acesso à localização.' : errorMessage(error, 'Não foi possível ativar a localização.'));
+  }
+}
+
+async function sendLocation(position, force = false) {
+  const now = Date.now();
+  if (!force && now - state.lastSentAt < CONFIG.locationSendThrottleMs) return;
+  const c = position.coords;
+  await refreshBatterySnapshot();
+
+  if (state.myDevice && state.deviceKey) {
+    const { error } = await supabase.rpc('upsert_my_device_location', {
+      p_device_key: state.deviceKey,
+      p_latitude: c.latitude,
+      p_longitude: c.longitude,
+      p_accuracy: Number.isFinite(c.accuracy) ? c.accuracy : null,
+      p_heading: Number.isFinite(c.heading) ? c.heading : null,
+      p_speed: Number.isFinite(c.speed) ? c.speed : null,
+      p_altitude: Number.isFinite(c.altitude) ? c.altitude : null,
+      p_battery_level: state.battery.level,
+      p_battery_charging: state.battery.charging
+    });
+    if (error) throw error;
+    // Mantém compatibilidade com o mapa familiar legado sem usar esse registro para o painel Mestre.
+    supabase.rpc('upsert_my_location', {
+      p_latitude: c.latitude,
+      p_longitude: c.longitude,
+      p_accuracy: Number.isFinite(c.accuracy) ? c.accuracy : null,
+      p_heading: Number.isFinite(c.heading) ? c.heading : null,
+      p_speed: Number.isFinite(c.speed) ? c.speed : null
+    }).catch?.(() => {});
+  } else {
+    const { error } = await supabase.rpc('upsert_my_location', {
+      p_latitude: c.latitude,
+      p_longitude: c.longitude,
+      p_accuracy: Number.isFinite(c.accuracy) ? c.accuracy : null,
+      p_heading: Number.isFinite(c.heading) ? c.heading : null,
+      p_speed: Number.isFinite(c.speed) ? c.speed : null
+    });
+    if (error) throw error;
+  }
+  state.lastSentAt = now;
+}
+
+async function disableLocationSharing() {
+  stopLocalWatcher();
+  try {
+    if (state.myDevice && state.deviceKey) {
+      const { error } = await supabase.rpc('set_my_device_location_sharing', { p_device_key: state.deviceKey, p_enabled: false });
+      if (error) throw error;
+    } else {
+      const { error } = await supabase.rpc('set_location_sharing', { p_enabled: false });
+      if (error) throw error;
+    }
+    if (state.profile) state.profile.location_sharing_enabled = false;
+    renderSharingState();
+    await refreshFamilyData(false);
+    if (state.family?.my_role === 'member') await refreshMemberDeviceCard();
+    toast('Compartilhamento desligado e última posição removida.');
+  } catch (error) { toast(errorMessage(error)); }
+}
+
+function stopLocalWatcher() {
+  if (state.watchId !== null && navigator.geolocation) navigator.geolocation.clearWatch(state.watchId);
+  state.watchId = null; state.lastSentAt = 0;
+}
+
+$('choose-city-btn').addEventListener('click', () => $('city-dialog').showModal());
+$('close-city-btn').addEventListener('click', () => $('city-dialog').close());
+$('city-search-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const query = $('city-search-input').value.trim();
+  if (query.length < 2) return;
+  const root = $('city-results'); root.textContent = 'Buscando…';
+  try {
+    const url = new URL('https://geocoding-api.open-meteo.com/v1/search');
+    url.searchParams.set('name', query); url.searchParams.set('count', '5'); url.searchParams.set('language', 'pt'); url.searchParams.set('format', 'json');
+    const response = await fet
