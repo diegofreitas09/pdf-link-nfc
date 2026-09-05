@@ -1,0 +1,133 @@
+t = 'Gere um código de vínculo no Perfil.';
+    $('master-device-online').textContent = 'Sem contato'; $('master-device-online').className = 'master-online-badge off';
+    $('master-battery').textContent = '—'; $('master-charging').textContent = 'Não disponível';
+    $('master-accuracy').textContent = '—'; $('master-last-update').textContent = '—';
+    $('master-focus-btn').disabled = true; $('master-route-btn').disabled = true; $('master-alert-btn').disabled = true;
+    $('master-photo-btn').disabled = true; $('master-audio-btn').disabled = true; $('master-media-btn').disabled = true;
+    return;
+  }
+  $('master-device-avatar').textContent = initials(d.display_name || 'M');
+  $('master-device-person').textContent = d.display_name || 'Membro';
+  $('master-device-name').textContent = `${d.device_name || 'Aparelho'}${d.platform ? ` • ${d.platform}` : ''}`;
+  $('master-device-online').textContent = d.is_online ? 'Online agora' : 'Sem contato';
+  $('master-device-online').className = `master-online-badge ${d.is_online ? 'on' : 'off'}`;
+
+  if (Number.isFinite(d.battery_level)) {
+    $('master-battery').textContent = `${d.battery_level}%`;
+    $('master-charging').textContent = d.battery_charging ? 'Carregando' : (d.battery_level <= 15 ? 'Bateria baixa' : 'Descarregando');
+  } else {
+    $('master-battery').textContent = '—';
+    $('master-charging').textContent = 'Não disponível neste navegador';
+  }
+  $('master-accuracy').textContent = Number.isFinite(d.accuracy) ? `${Math.round(d.accuracy)} m` : '—';
+  $('master-last-update').textContent = relativeTime(d.captured_at || d.last_seen_at);
+  setPermission('master-perm-location', d.location_permission);
+  setPermission('master-perm-camera', d.camera_permission);
+  setPermission('master-perm-mic', d.microphone_permission);
+  setPermission('master-perm-notif', d.notification_permission);
+  $('master-platform').textContent = d.platform || '—';
+  $('master-browser').textContent = d.browser || '—';
+
+  const hasPosition = Number.isFinite(d.latitude) && Number.isFinite(d.longitude);
+  $('master-focus-btn').disabled = !hasPosition;
+  $('master-route-btn').disabled = !hasPosition;
+  $('master-alert-btn').disabled = !d.device_id;
+  $('master-photo-btn').disabled = !d.device_id || d.camera_permission !== 'granted';
+  $('master-audio-btn').disabled = !d.device_id || d.microphone_permission !== 'granted';
+  $('master-media-btn').disabled = !d.device_id;
+}
+
+function ensureMasterMap() {
+  if (state.masterMap) return state.masterMap;
+  const node = $('master-map');
+  if (!node) return null;
+  state.masterMap = L.map(node, { zoomControl: true, attributionControl: true, preferCanvas: true })
+    .setView(CONFIG.defaultMapCenter, CONFIG.defaultMapZoom);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    updateWhenIdle: false,
+    keepBuffer: 4,
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(state.masterMap);
+  const fix = () => state.masterMap?.invalidateSize(true);
+  requestAnimationFrame(fix);
+  setTimeout(fix, 150);
+  setTimeout(fix, 600);
+  window.addEventListener('resize', fix, { passive: true });
+  return state.masterMap;
+}
+
+function masterDivIcon(name, online = false) {
+  return L.divIcon({
+    className: '',
+    html: `<div class="master-marker${online ? ' online' : ' stale'}">${initials(name)}</div>`,
+    iconSize: [44,44], iconAnchor: [22,22]
+  });
+}
+
+function renderMasterMap(focusSelected = false, fitAll = false) {
+  if (state.family?.my_role !== 'owner' || $('master-experience')?.classList.contains('hidden')) return;
+  const map = ensureMasterMap(); if (!map) return;
+  map.invalidateSize(true);
+  for (const layer of state.masterLayers) map.removeLayer(layer);
+  state.masterLayers = [];
+  const points = state.masterDevices.filter((d) => Number.isFinite(d.latitude) && Number.isFinite(d.longitude));
+  $('master-map-empty').classList.toggle('hidden', points.length > 0);
+  if (!points.length) {
+    map.setView(CONFIG.defaultMapCenter, CONFIG.defaultMapZoom);
+    setTimeout(() => map.invalidateSize(true), 80);
+    return;
+  }
+  const bounds = [];
+  for (const d of points) {
+    const latlng = [d.latitude, d.longitude]; bounds.push(latlng);
+    const marker = L.marker(latlng, { icon: masterDivIcon(d.display_name || 'M', Boolean(d.is_online)) }).addTo(map);
+    marker.bindTooltip(`${d.display_name || 'Membro'} • ${d.is_online ? 'online' : `última posição ${relativeTime(d.captured_at || d.last_seen_at)}`}`, { direction:'top', offset:[0,-20] });
+    marker.on('click', () => {
+      state.selectedMasterDeviceId = d.device_id;
+      renderMasterMembers(); renderMasterDevice();
+    });
+    state.masterLayers.push(marker);
+  }
+  const selected = getSelectedMasterDevice();
+  if (focusSelected && selected && Number.isFinite(selected.latitude) && Number.isFinite(selected.longitude)) {
+    map.flyTo([selected.latitude, selected.longitude], 18, { duration: .55 });
+  } else if (fitAll || points.length > 1) {
+    map.fitBounds(bounds, { padding:[50,50], maxZoom:16 });
+  } else {
+    map.setView([points[0].latitude, points[0].longitude], 17);
+  }
+  setTimeout(() => map.invalidateSize(true), 100);
+}
+
+function alertStatusLabel(status) {
+  if (status === 'acknowledged') return 'Confirmado';
+  if (status === 'dismissed') return 'Dispensado';
+  if (status === 'expired') return 'Expirado';
+  return 'Aguardando';
+}
+
+async function renderMasterAlerts() {
+  const root = $('master-alerts-list'); if (!root || state.family?.my_role !== 'owner') return;
+  root.replaceChildren();
+  const [sosResult, reqResult] = await Promise.all([
+    supabase.from('sos_alerts').select('id,user_id,status,created_at').eq('status','open').order('created_at',{ascending:false}).limit(20),
+    supabase.from('device_alert_requests').select('id,device_id,target_user_id,status,request_type,created_at,responded_at').order('created_at',{ascending:false}).limit(20)
+  ]);
+  if (sosResult.error && reqResult.error) {
+    const p=document.createElement('p'); p.className='master-muted'; p.textContent='Não foi possível carregar os alertas.'; root.append(p); return;
+  }
+  const names = new Map(state.masterDevices.map((d) => [d.member_user_id, d.display_name]));
+  const entries=[];
+  for (const a of sosResult.data || []) entries.push({kind:'sos',created_at:a.created_at,data:a});
+  for (const a of reqResult.data || []) entries.push({kind:'request',created_at:a.created_at,data:a});
+  entries.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+  if (!entries.length) {
+    const p=document.createElement('p'); p.className='master-muted'; p.textContent='Nenhum alerta registrado.'; root.append(p); return;
+  }
+  for (const entry of entries.slice(0,30)) {
+    const item=document.createElement('div'); item.className='master-feed-item';
+    const icon=document.createElement('div'); icon.className='master-feed-icon';
+    const copy=document.createElement('div'); copy.className='master-feed-copy';
+    const strong=document.createElement('strong');
+    
