@@ -1,0 +1,167 @@
+solveAlert(id) {
+  const { error } = await supabase.rpc('resolve_sos_alert',{p_alert_id:id});
+  if (error) return toast(errorMessage(error));
+  await loadAlerts(); toast('Alerta marcado como resolvido.');
+}
+
+
+// ===== Aparelho do membro: vínculo, heartbeat, bateria e alertas consentidos =====
+function detectPlatform() {
+  const ua = navigator.userAgent || '';
+  if (/Android/i.test(ua)) return 'Android';
+  if (/iPhone|iPad|iPod/i.test(ua)) return 'iOS';
+  if (/Windows/i.test(ua)) return 'Windows';
+  if (/Macintosh|Mac OS/i.test(ua)) return 'macOS';
+  return navigator.platform || 'Web';
+}
+
+function detectBrowser() {
+  const ua = navigator.userAgent || '';
+  if (/Edg\//.test(ua)) return 'Edge';
+  if (/OPR\//.test(ua)) return 'Opera';
+  if (/Chrome\//.test(ua)) return 'Chrome';
+  if (/Firefox\//.test(ua)) return 'Firefox';
+  if (/Safari\//.test(ua) && !/Chrome\//.test(ua)) return 'Safari';
+  return 'Navegador';
+}
+
+function detectInstallMode() {
+  return window.matchMedia?.('(display-mode: standalone)').matches || navigator.standalone ? 'standalone' : 'browser';
+}
+
+function createDeviceKey() {
+  return crypto.randomUUID ? crypto.randomUUID() : `web-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+async function refreshBatterySnapshot() {
+  if (!navigator.getBattery) {
+    state.battery = { level: null, charging: null };
+    return state.battery;
+  }
+  try {
+    if (!state.batteryManager) {
+      state.batteryManager = await navigator.getBattery();
+      const update = () => {
+        state.battery.level = Number.isFinite(state.batteryManager.level) ? Math.round(state.batteryManager.level * 100) : null;
+        state.battery.charging = typeof state.batteryManager.charging === 'boolean' ? state.batteryManager.charging : null;
+      };
+      state.batteryManager.addEventListener?.('levelchange', update);
+      state.batteryManager.addEventListener?.('chargingchange', update);
+      update();
+    } else {
+      state.battery.level = Number.isFinite(state.batteryManager.level) ? Math.round(state.batteryManager.level * 100) : null;
+      state.battery.charging = typeof state.batteryManager.charging === 'boolean' ? state.batteryManager.charging : null;
+    }
+  } catch {
+    state.battery = { level: null, charging: null };
+  }
+  return state.battery;
+}
+
+async function initializeMemberDevice() {
+  const card = $('member-device-card');
+  if (!card || state.family?.my_role === 'owner') return;
+  card.classList.remove('hidden');
+  await refreshBatterySnapshot();
+  let storedKey = localStorage.getItem('familia360_device_key');
+  const { data: devices, error } = await supabase.from('user_devices')
+    .select('id,user_id,family_id,device_key,device_name,platform,browser,app_version,install_mode,location_permission,camera_permission,microphone_permission,notification_permission,location_sharing_enabled,last_seen_at,battery_level,battery_charging,paired_at,revoked_at,updated_at')
+    .eq('user_id', state.user.id)
+    .is('revoked_at', null)
+    .order('updated_at', { ascending: false });
+  if (error) {
+    toast(errorMessage(error, 'Não foi possível preparar este aparelho.'));
+    return;
+  }
+  let device = (devices || []).find((d) => storedKey && d.device_key === storedKey)
+    || (devices || []).find((d) => d.paired_at)
+    || (devices || [])[0]
+    || null;
+
+  if (!device) {
+    storedKey = storedKey || createDeviceKey();
+    localStorage.setItem('familia360_device_key', storedKey);
+    const { error: regError } = await supabase.rpc('register_my_device', {
+      p_device_key: storedKey,
+      p_device_name: 'Celular Android',
+      p_platform: detectPlatform(),
+      p_browser: detectBrowser(),
+      p_app_version: '3.1.0',
+      p_install_mode: detectInstallMode()
+    });
+    if (regError) return toast(errorMessage(regError, 'Não foi possível registrar o aparelho.'));
+    const { data: fresh } = await supabase.from('user_devices').select('*').eq('user_id', state.user.id).eq('device_key', storedKey).maybeSingle();
+    device = fresh || null;
+  } else {
+    storedKey = device.device_key;
+    localStorage.setItem('familia360_device_key', storedKey);
+  }
+
+  state.deviceKey = storedKey;
+  state.myDevice = device;
+  await refreshMemberDeviceCard();
+  startDeviceHeartbeat();
+  startPendingAlertChecks();
+}
+
+async function refreshMemberDeviceCard() {
+  if (!state.deviceKey || !$('member-device-card')) return;
+  const { data } = await supabase.from('user_devices').select('*').eq('user_id', state.user.id).eq('device_key', state.deviceKey).maybeSingle();
+  if (data) state.myDevice = data;
+  const d = state.myDevice;
+  if (!d) return;
+  $('member-device-title').textContent = d.device_name || 'Este aparelho';
+  const paired = Boolean(d.paired_at && d.family_id);
+  $('member-device-status').textContent = paired ? (d.location_sharing_enabled ? 'Compartilhando' : 'Vinculado') : 'Não vinculado';
+  $('member-device-status').className = `device-status-pill ${paired ? 'ok' : 'warn'}`;
+  $('member-device-copy').textContent = paired
+    ? `Vinculado à família. Último contato ${relativeTime(d.last_seen_at)}.${d.location_sharing_enabled ? ' Localização ativa.' : ''}`
+    : 'Digite o código de vínculo gerado pelo Mestre para conectar este aparelho.';
+  $('pair-device-form').classList.toggle('hidden', paired);
+  if (state.profile) state.profile.location_sharing_enabled = Boolean(d.location_sharing_enabled);
+  renderSharingState();
+}
+
+function stopDeviceRuntime() {
+  if (state.heartbeatTimer) clearInterval(state.heartbeatTimer);
+  if (state.pendingAlertTimer) clearInterval(state.pendingAlertTimer);
+  if (state.audioStopTimer) clearTimeout(state.audioStopTimer);
+  state.heartbeatTimer = null;
+  state.pendingAlertTimer = null;
+  state.audioStopTimer = null;
+  stopActiveMediaStream();
+}
+
+function startDeviceHeartbeat() {
+  if (!state.deviceKey || !state.myDevice) return;
+  if (state.heartbeatTimer) clearInterval(state.heartbeatTimer);
+  const tick = async () => {
+    if (document.visibilityState === 'hidden') return;
+    await refreshBatterySnapshot();
+    const { error } = await supabase.rpc('heartbeat_my_device', {
+      p_device_key: state.deviceKey,
+      p_battery_level: state.battery.level,
+      p_battery_charging: state.battery.charging
+    });
+    if (!error) refreshMemberDeviceCard().catch(() => {});
+  };
+  tick().catch(() => {});
+  state.heartbeatTimer = setInterval(() => tick().catch(() => {}), 30000);
+}
+
+async function updateDevicePermissionState({ location = null, camera = null, microphone = null, notifications = null } = {}) {
+  if (!state.deviceKey) return;
+  const { error } = await supabase.rpc('update_my_device_permissions', {
+    p_device_key: state.deviceKey,
+    p_location: location,
+    p_camera: camera,
+    p_microphone: microphone,
+    p_notifications: notifications
+  });
+  if (error) throw error;
+  await refreshMemberDeviceCard();
+}
+
+$('pair-device-form')?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const code = $('pair-device-code').value.trim().toUpp
