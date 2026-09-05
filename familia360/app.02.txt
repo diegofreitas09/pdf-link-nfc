@@ -1,0 +1,167 @@
+renderFamilySummary();
+}
+
+function renderHeader() {
+  $('welcome-name').textContent = state.profile?.display_name ? `Olá, ${state.profile.display_name}` : 'Olá';
+}
+
+function renderFamilySummary() {
+  const hasFamily = Boolean(state.family);
+  $('family-onboarding').classList.toggle('hidden', hasFamily);
+  $('family-summary-title').textContent = hasFamily ? state.family.family_name : 'Nenhuma família conectada';
+  $('family-summary-text').textContent = hasFamily
+    ? `Você participa como ${state.family.my_role === 'owner' ? 'responsável pelo grupo' : 'membro'}.`
+    : 'Crie ou entre em uma família para usar mapa e SOS.';
+  $('family-name-title').textContent = state.family?.family_name || 'Família';
+  const canInvite = state.family?.my_role === 'owner' && state.family?.invite_code;
+  $('invite-card').classList.toggle('hidden', !canInvite);
+  $('invite-code').textContent = canInvite ? state.family.invite_code : '—';
+  $('sos-btn').disabled = !hasFamily;
+  renderSharingState();
+}
+
+$('create-family-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  try {
+    const { error } = await supabase.rpc('create_family', { p_name: $('family-name').value.trim() });
+    if (error) throw error;
+    await loadFamilySettings();
+    await refreshFamilyData();
+    if (state.family?.my_role === 'owner') { await loadMasterDevices(false); activateMasterExperience(); }
+    setupRealtime();
+    toast('Família criada. Use o Perfil para gerar um código de vínculo do aparelho.');
+  } catch (error) { toast(errorMessage(error)); }
+});
+
+$('join-family-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  try {
+    const code = $('invite-code-input').value.trim().toUpperCase();
+    const { error } = await supabase.rpc('join_family', { p_invite_code: code });
+    if (error) throw error;
+    await loadFamilySettings();
+    await refreshFamilyData();
+    deactivateMasterExperience();
+    await initializeMemberDevice();
+    setupRealtime();
+    toast('Você entrou na família.');
+  } catch (error) { toast(errorMessage(error)); }
+});
+
+$('copy-invite-btn').addEventListener('click', async () => {
+  if (!state.family?.invite_code) return;
+  try {
+    await navigator.clipboard.writeText(state.family.invite_code);
+    toast('Código copiado.');
+  } catch { toast(`Código: ${state.family.invite_code}`); }
+});
+
+async function refreshFamilyData(showFeedback = true) {
+  if (!state.family) {
+    state.dashboard = [];
+    renderMembers();
+    renderMap();
+    await loadAlerts();
+    return;
+  }
+  const { data, error } = await supabase.rpc('get_family_dashboard');
+  if (error) {
+    if (showFeedback) toast(errorMessage(error));
+    return;
+  }
+  state.dashboard = data || [];
+  renderMembers();
+  renderMap();
+  await loadAlerts();
+}
+
+function initials(name = 'M') {
+  return name.split(/\s+/).filter(Boolean).slice(0,2).map((p) => p[0]?.toUpperCase()).join('') || 'M';
+}
+
+function relativeTime(iso) {
+  if (!iso) return 'sem posição recente';
+  const diff = Math.max(0, Date.now() - new Date(iso).getTime());
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return 'agora';
+  if (min === 1) return 'há 1 min';
+  if (min < 60) return `há ${min} min`;
+  return `há ${Math.floor(min / 60)} h`;
+}
+
+function renderMembers() {
+  const root = $('members-list');
+  root.replaceChildren();
+  if (!state.dashboard.length) {
+    const p = document.createElement('p'); p.className = 'muted'; p.textContent = state.family ? 'Nenhum membro encontrado.' : 'Conecte uma família primeiro.'; root.append(p); return;
+  }
+  for (const member of state.dashboard) {
+    const row = document.createElement('div'); row.className = 'member';
+    const avatar = document.createElement('div'); avatar.className = 'avatar'; avatar.textContent = initials(member.display_name);
+    const info = document.createElement('div'); info.className = 'member-info';
+    const strong = document.createElement('strong'); strong.textContent = member.display_name || 'Membro';
+    const meta = document.createElement('span');
+    const isMe = member.member_user_id === state.user?.id;
+    meta.textContent = `${isMe ? 'Você • ' : ''}${member.member_role === 'owner' ? 'Responsável' : 'Membro'} • ${relativeTime(member.captured_at)}`;
+    info.append(strong, meta);
+    const status = document.createElement('span');
+    const live = Number.isFinite(member.latitude) && Number.isFinite(member.longitude);
+    status.className = `member-status ${live ? 'live' : 'off'}`;
+    status.textContent = live ? 'Compartilhando' : (member.location_sharing_enabled ? 'Sem posição recente' : 'Desligado');
+    row.append(avatar, info, status); root.append(row);
+  }
+}
+
+function ensureMap() {
+  if (state.map) return state.map;
+  state.map = L.map('map', { zoomControl: true, attributionControl: true }).setView(CONFIG.defaultMapCenter, CONFIG.defaultMapZoom);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(state.map);
+  setTimeout(() => state.map?.invalidateSize(), 50);
+  return state.map;
+}
+
+function renderMap() {
+  if (!state.map && !$('map-panel').classList.contains('active-panel')) return;
+  const map = ensureMap();
+  for (const layer of state.mapLayers) map.removeLayer(layer);
+  state.mapLayers = [];
+  const points = state.dashboard.filter((m) => Number.isFinite(m.latitude) && Number.isFinite(m.longitude));
+  $('map-empty').classList.toggle('hidden', points.length > 0);
+  if (!points.length) {
+    const center = Number.isFinite(state.profile?.weather_latitude) && Number.isFinite(state.profile?.weather_longitude)
+      ? [state.profile.weather_latitude, state.profile.weather_longitude]
+      : CONFIG.defaultMapCenter;
+    map.setView(center, CONFIG.defaultMapZoom);
+    setTimeout(() => map.invalidateSize(), 30);
+    return;
+  }
+  const bounds = [];
+  for (const member of points) {
+    const latlng = [member.latitude, member.longitude];
+    bounds.push(latlng);
+    const marker = L.circleMarker(latlng, { radius: 10, weight: 3, fillOpacity: .78 });
+    const popup = document.createElement('div');
+    const name = document.createElement('strong'); name.textContent = member.display_name || 'Membro';
+    const br = document.createElement('br');
+    const when = document.createElement('span'); when.textContent = `Atualizado ${relativeTime(member.captured_at)}`;
+    popup.append(name, br, when);
+    marker.bindPopup(popup).addTo(map);
+    state.mapLayers.push(marker);
+  }
+  map.fitBounds(bounds, { padding: [35,35], maxZoom: 16 });
+  setTimeout(() => map.invalidateSize(), 30);
+}
+
+$('refresh-map-btn').addEventListener('click', () => refreshFamilyData());
+
+function renderSharingState() {
+  const banner = $('sharing-banner');
+  const title = $('sharing-title');
+  const detail = $('sharing-detail');
+  const mainBtn = $('share-location-btn');
+  const disableBtn = $('disable-share-btn');
+  const note = $('location-note');
+  const hasFamily = Boolean(state.family);
