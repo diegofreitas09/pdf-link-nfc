@@ -1,0 +1,212 @@
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.115.0/+esm';
+import * as LeafletModule from 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/+esm';
+const CONFIG = Object.freeze({
+  supabaseUrl: 'https://kevillefdybgadutiypo.supabase.co',
+  supabasePublishableKey: 'sb_publishable_Bpx1O-662JPP4uH0bDHS9g_ymXISucW',
+  locationFreshnessMinutes: 30,
+  locationSendThrottleMs: 15000,
+  defaultMapCenter: [-3.7319, -38.5267],
+  defaultMapZoom: 11
+});
+
+
+const L = LeafletModule.default || LeafletModule;
+const supabase = createClient(CONFIG.supabaseUrl, CONFIG.supabasePublishableKey, {
+  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+});
+
+const $ = (id) => document.getElementById(id);
+const state = {
+  user: null,
+  profile: null,
+  family: null,
+  dashboard: [],
+  map: null,
+  mapLayers: [],
+  watchId: null,
+  lastSentAt: 0,
+  realtimeChannels: [],
+  pollTimer: null,
+  realtimeRefreshTimer: null,
+  installPrompt: null,
+  masterDevices: [],
+  masterMap: null,
+  masterLayers: [],
+  selectedMasterDeviceId: null,
+  myDevice: null,
+  deviceKey: null,
+  heartbeatTimer: null,
+  battery: { level: null, charging: null },
+  batteryManager: null,
+  pendingAlertRequest: null,
+  pendingAlertTimer: null,
+  masterPlaces: [],
+  masterActivity: [],
+  activeMediaStream: null,
+  activeMediaRequest: null,
+  mediaRecorder: null,
+  audioChunks: [],
+  audioRecordingStartedAt: 0,
+  audioStopTimer: null
+};
+
+function toast(message, ms = 3200) {
+  const el = $('toast');
+  el.textContent = message;
+  el.classList.add('show');
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => el.classList.remove('show'), ms);
+}
+
+function setAuthMessage(message, isError = false) {
+  const el = $('auth-message');
+  el.textContent = message || '';
+  el.style.color = isError ? '#b72f43' : '#176b87';
+}
+
+function errorMessage(error, fallback = 'Não foi possível concluir a operação.') {
+  if (!error) return fallback;
+  const raw = String(error.message || error);
+  if (raw.includes('Invalid login credentials')) return 'E-mail ou senha inválidos.';
+  if (raw.includes('Email not confirmed')) return 'Confirme seu e-mail antes de entrar.';
+  if (raw.includes('User already registered')) return 'Este e-mail já está cadastrado.';
+  if (raw.includes('Código inválido')) return 'Código de família inválido.';
+  return raw || fallback;
+}
+
+function showAuth(mode = 'login') {
+  const login = mode === 'login';
+  $('login-form').classList.toggle('hidden', !login);
+  $('signup-form').classList.toggle('hidden', login);
+  $('show-login').classList.toggle('segmented-active', login);
+  $('show-signup').classList.toggle('segmented-active', !login);
+  setAuthMessage('');
+}
+
+$('show-login').addEventListener('click', () => showAuth('login'));
+$('show-signup').addEventListener('click', () => showAuth('signup'));
+
+$('login-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  setAuthMessage('Entrando…');
+  const { error } = await supabase.auth.signInWithPassword({
+    email: $('login-email').value.trim(),
+    password: $('login-password').value
+  });
+  if (error) setAuthMessage(errorMessage(error), true);
+});
+
+$('signup-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const displayName = $('signup-name').value.trim();
+  setAuthMessage('Criando sua conta…');
+  const redirectTo = new URL('./', window.location.href).href;
+  const { data, error } = await supabase.auth.signUp({
+    email: $('signup-email').value.trim(),
+    password: $('signup-password').value,
+    options: { data: { display_name: displayName }, emailRedirectTo: redirectTo }
+  });
+  if (error) return setAuthMessage(errorMessage(error), true);
+  if (!data.session) {
+    setAuthMessage('Conta criada. Confira seu e-mail para confirmar o cadastro.');
+  } else {
+    setAuthMessage('Conta criada com sucesso.');
+  }
+});
+
+$('logout-btn').addEventListener('click', async () => {
+  stopLocalWatcher();
+  cleanupRealtime();
+  await supabase.auth.signOut();
+});
+
+supabase.auth.onAuthStateChange((event, session) => {
+  if (event === 'SIGNED_OUT' || !session) {
+    resetToAuth();
+  } else if (['SIGNED_IN', 'TOKEN_REFRESHED', 'USER_UPDATED', 'INITIAL_SESSION'].includes(event)) {
+    queueMicrotask(() => initializeAuthenticatedApp());
+  }
+});
+
+async function bootstrap() {
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').then((reg) => reg.update()).catch(() => {});
+    });
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (sessionStorage.getItem('familia360_sw_v3_reloaded')) return;
+      sessionStorage.setItem('familia360_sw_v3_reloaded', '1');
+      window.location.reload();
+    });
+  }
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) await initializeAuthenticatedApp();
+    else resetToAuth();
+  } catch {
+    resetToAuth();
+  }
+}
+
+function resetToAuth() {
+  stopLocalWatcher();
+  cleanupRealtime();
+  if (state.pollTimer) clearInterval(state.pollTimer);
+  state.user = null;
+  state.profile = null;
+  state.family = null;
+  state.dashboard = [];
+  state.masterDevices = [];
+  state.selectedMasterDeviceId = null;
+  stopDeviceRuntime();
+  state.myDevice = null;
+  state.deviceKey = null;
+  state.pendingAlertRequest = null;
+  document.body.classList.remove('master-mode');
+  $('master-experience')?.classList.add('hidden');
+  $('app-screen').classList.add('hidden');
+  $('auth-screen').classList.remove('hidden');
+  showAuth('login');
+}
+
+async function initializeAuthenticatedApp() {
+  const { data: { user }, error } = await supabase.auth.getUser();
+  if (error || !user) return resetToAuth();
+  if (state.user?.id === user.id && !$('app-screen').classList.contains('hidden')) return;
+  state.user = user;
+  $('auth-screen').classList.add('hidden');
+  $('app-screen').classList.remove('hidden');
+  await Promise.all([loadProfile(), loadFamilySettings()]);
+  renderHeader();
+  renderSharingState();
+  await loadWeather();
+  await refreshFamilyData();
+  if (state.family?.my_role === 'owner') {
+    stopDeviceRuntime();
+    await loadMasterDevices();
+    activateMasterExperience();
+  } else {
+    deactivateMasterExperience();
+    await initializeMemberDevice();
+  }
+  setupRealtime();
+  if (state.pollTimer) clearInterval(state.pollTimer);
+  state.pollTimer = setInterval(() => refreshFamilyData(false), 30000);
+}
+
+async function loadProfile() {
+  let { data, error } = await supabase.rpc('get_my_profile');
+  if (error) throw error;
+  if (!data?.length) {
+    await supabase.rpc('update_my_profile', { p_display_name: state.user.email?.split('@')[0] || 'Membro' });
+    ({ data, error } = await supabase.rpc('get_my_profile'));
+    if (error) throw error;
+  }
+  state.profile = data?.[0] || null;
+}
+
+async function loadFamilySettings() {
+  const { data, error } = await supabase.rpc('get_my_family_settings');
+  if (error) throw error;
+  state.family = data?.[0] || null;
+  
