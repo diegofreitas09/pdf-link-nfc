@@ -1,0 +1,119 @@
+=> {});
+  state.activeMediaRequest = null; state.pendingAlertRequest = null;
+  stopActiveMediaStream();
+  $('member-photo-dialog')?.close(); $('member-audio-dialog')?.close(); $('member-alert-dialog')?.close();
+}
+
+async function startPhotoCapture(req) {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
+    state.activeMediaStream = stream; state.activeMediaRequest = req;
+    await updateDevicePermissionState({ camera: 'granted' }).catch(() => {});
+    const video = $('member-photo-preview'); video.srcObject = stream; await video.play().catch(() => {});
+    $('member-photo-dialog')?.showModal();
+  } catch {
+    await updateDevicePermissionState({ camera: 'denied' }).catch(() => {});
+    toast('Não foi possível abrir a câmera.');
+    await dismissCurrentMediaRequest();
+  }
+}
+
+async function startAudioCapture(req) {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
+    state.activeMediaStream = stream; state.activeMediaRequest = req; state.audioChunks = [];
+    await updateDevicePermissionState({ microphone: 'granted' }).catch(() => {});
+    $('audio-recording-status').textContent = 'Pronto para gravar'; $('audio-recording-status').className = 'recording-status';
+    $('start-audio-recording').classList.remove('hidden'); $('stop-audio-recording').classList.add('hidden');
+    $('member-audio-dialog')?.showModal();
+  } catch {
+    await updateDevicePermissionState({ microphone: 'denied' }).catch(() => {});
+    toast('Não foi possível abrir o microfone.');
+    await dismissCurrentMediaRequest();
+  }
+}
+
+$('accept-alert-request')?.addEventListener('click', async () => {
+  const req = state.pendingAlertRequest; if (!req) return;
+  $('member-alert-dialog')?.close();
+  if ((req.request_type || 'attention') === 'photo') { state.pendingAlertRequest = null; return startPhotoCapture(req); }
+  if (req.request_type === 'audio') { state.pendingAlertRequest = null; return startAudioCapture(req); }
+  playConsentAlertSound();
+  await supabase.rpc('respond_device_alert_request', { p_request_id: req.id, p_status: 'acknowledged' });
+  state.pendingAlertRequest = null;
+  toast('Alerta reproduzido e confirmado.');
+});
+$('dismiss-alert-request')?.addEventListener('click', async () => {
+  const req = state.pendingAlertRequest; if (!req) return $('member-alert-dialog')?.close();
+  await supabase.rpc('dismiss_device_request', { p_request_id: req.id });
+  state.pendingAlertRequest = null; $('member-alert-dialog')?.close();
+});
+
+$('capture-photo-send')?.addEventListener('click', async () => {
+  const req = state.activeMediaRequest, video = $('member-photo-preview'), canvas = $('member-photo-canvas');
+  if (!req || !video?.videoWidth) return toast('A câmera ainda está preparando a imagem.');
+  const maxW = 720, scale = Math.min(1, maxW / video.videoWidth);
+  canvas.width = Math.round(video.videoWidth * scale); canvas.height = Math.round(video.videoHeight * scale);
+  canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+  const data = canvas.toDataURL('image/jpeg', .72).split(',')[1];
+  const { error } = await supabase.rpc('submit_device_media', { p_request_id:req.id, p_media_type:'photo', p_content_type:'image/jpeg', p_data_base64:data, p_duration_ms:null });
+  if (error) return toast(errorMessage(error, 'Não foi possível enviar a foto.'));
+  state.activeMediaRequest = null; stopActiveMediaStream(); $('member-photo-dialog')?.close(); toast('Foto enviada para o responsável.');
+});
+$('cancel-photo-capture')?.addEventListener('click', dismissCurrentMediaRequest);
+$('close-photo-capture')?.addEventListener('click', dismissCurrentMediaRequest);
+
+$('start-audio-recording')?.addEventListener('click', () => {
+  if (!state.activeMediaStream || !state.activeMediaRequest || !window.MediaRecorder) return toast('Gravação de áudio não suportada neste navegador.');
+  const preferred = ['audio/webm;codecs=opus','audio/webm','audio/mp4'].find((t) => MediaRecorder.isTypeSupported?.(t)) || '';
+  state.audioChunks = []; state.audioRecordingStartedAt = Date.now();
+  state.mediaRecorder = preferred ? new MediaRecorder(state.activeMediaStream,{mimeType:preferred}) : new MediaRecorder(state.activeMediaStream);
+  state.mediaRecorder.ondataavailable = (e) => { if (e.data?.size) state.audioChunks.push(e.data); };
+  state.mediaRecorder.start();
+  $('audio-recording-status').textContent = '● Gravando… máximo 15 s'; $('audio-recording-status').className = 'recording-status live';
+  $('start-audio-recording').classList.add('hidden'); $('stop-audio-recording').classList.remove('hidden');
+  state.audioStopTimer = setTimeout(() => $('stop-audio-recording')?.click(), 15000);
+});
+
+$('stop-audio-recording')?.addEventListener('click', async () => {
+  if (!state.mediaRecorder || state.mediaRecorder.state === 'inactive') return;
+  if (state.audioStopTimer) clearTimeout(state.audioStopTimer); state.audioStopTimer = null;
+  const recorder = state.mediaRecorder, req = state.activeMediaRequest, duration = Math.min(30000, Date.now() - state.audioRecordingStartedAt);
+  const mime = recorder.mimeType || 'audio/webm';
+  const done = new Promise((resolve) => { recorder.onstop = resolve; });
+  recorder.stop(); await done;
+  const blob = new Blob(state.audioChunks, { type:mime });
+  const data = await blobToBase64(blob);
+  const { error } = await supabase.rpc('submit_device_media', { p_request_id:req.id, p_media_type:'audio', p_content_type:mime.split(';')[0] || 'audio/webm', p_data_base64:data, p_duration_ms:duration });
+  if (error) return toast(errorMessage(error, 'Não foi possível enviar o áudio.'));
+  state.activeMediaRequest = null; stopActiveMediaStream(); $('member-audio-dialog')?.close(); toast('Áudio enviado para o responsável.');
+});
+$('cancel-audio-capture')?.addEventListener('click', dismissCurrentMediaRequest);
+$('close-audio-capture')?.addEventListener('click', dismissCurrentMediaRequest);
+
+function cleanupRealtime() {
+  for (const channel of state.realtimeChannels) supabase.removeChannel(channel).catch?.(() => {});
+  state.realtimeChannels=[];
+}
+
+function scheduleRealtimeRefresh() {
+  clearTimeout(state.realtimeRefreshTimer);
+  state.realtimeRefreshTimer=setTimeout(async()=>{
+    await refreshFamilyData(false);
+    if(state.family?.my_role==='owner') {
+      await loadMasterDevices(false);
+      await Promise.all([loadMasterPlaces(), loadMasterActivity(), renderMasterAlerts()]);
+    } else {
+      await refreshMemberDeviceCard().catch(() => {});
+      await checkPendingAlertRequests().catch(() => {});
+    }
+  },350);
+}
+
+function setupRealtime() {
+  cleanupRealtime();
+  if (!state.family?.family_id) return;
+  const filter=`family_id=eq.${state.family.family_id}`;
+  const locations=supabase.channel(`family-locations-${state.family.family_id}`)
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'latest_locations',filter},scheduleRealtimeRefresh)
+    .on('postgres_ch
