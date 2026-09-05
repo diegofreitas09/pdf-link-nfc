@@ -1,0 +1,1 @@
+(()=>{const B='https://cdn.jsdelivr.net/gh/diegofreitas09/pdf-link-nfc@familia360-assets/familia360/';const ps=["style.01.txt?v=31", "style.02.txt?v=31", "style.03.txt?v=31", "style.04.txt?v=31"];Promise.all(ps.map(p=>fetch(B+p,{cache:'no-store'}).then(r=>r.text()))).then(xs=>{const s=document.createElement('style');s.textContent=xs.join('');document.head.appendChild(s)})})();
