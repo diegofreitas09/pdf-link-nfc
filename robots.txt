@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://lavato-estetica-automotivo-jr.netlify.app/sitemap.xml
