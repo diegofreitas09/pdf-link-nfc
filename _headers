@@ -1,0 +1,4 @@
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'sha256-TNw+YdULAXOSEeV7LmfFJWrZOS9++n6l1mvgFbddCgs='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://images.unsplash.com https://raw.githubusercontent.com; connect-src 'self'; font-src 'self' data:; object-src 'none'; base-uri 'self'; frame-src 'none'; frame-ancestors 'self'
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
