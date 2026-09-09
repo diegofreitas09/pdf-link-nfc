@@ -1,0 +1,31 @@
+name: Aurora Fechamento v10
+on:
+  push:
+    paths:
+      - '.github/workflows/aurora-fechamento-v10.yml'
+permissions:
+  contents: write
+jobs:
+  ativar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inserir Fechamento Aurora v10
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('aurora-gestao-2027/index.html')
+          s=p.read_text(encoding='utf-8')
+          tag='<script src="./fechamento-v10.js?v=10"></script>'
+          if tag not in s:
+              s=s.replace('</body>', tag+'\n</body>')
+              p.write_text(s,encoding='utf-8')
+          PY
+      - name: Publicar alteração
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add aurora-gestao-2027/index.html
+          git commit -m 'Ativa Fechamento Aurora 2027 no modelo do Cora'
+          git push
