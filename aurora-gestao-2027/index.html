@@ -87,5 +87,6 @@ $('#refresh').onclick=refresh;$('#logout').onclick=()=>location.reload();
 $('#form').onsubmit=async e=>{e.preventDefault();let b=$('#enter');b.disabled=true;b.textContent='Entrando...';$('#err').textContent='';P=$('#pw').value;try{let d=await api('get');S=d.state;V=d.version;$('#login').style.display='none';$('#app').style.display='block';show('dash');syn('','Nuvem sincronizada');toast('✓ Base segura carregada')}catch(x){P='';$('#err').textContent=x.status===401?'Senha incorreta.':'Não foi possível abrir a plataforma.'}finally{b.disabled=false;b.textContent='Entrar na plataforma'}};
 </script>
 <script src="./secretaria-v7.js?v=7"></script>
+<script src="./financeiro-cadastro-v8.js?v=8"></script>
 </body>
 </html>
