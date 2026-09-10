@@ -1,0 +1,31 @@
+name: Aurora Fix Loop v17
+on:
+  push:
+    paths:
+      - '.github/workflows/aurora-fix-loop-v17.yml'
+permissions:
+  contents: write
+jobs:
+  corrigir:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Corrigir cache da identidade e logo inicial
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('aurora-gestao-2027/index.html')
+          s=p.read_text(encoding='utf-8')
+          s=s.replace('<div class="mark">A</div>','<div class="mark"><img src="./aurora-logo.png?v=17" alt="Aurora" style="width:100%;height:100%;object-fit:contain"></div>')
+          s=s.replace('<div class="brand"><b>Aurora</b><span>Gestão da Direção 2027</span></div>','<div class="brand"><img src="./aurora-logo.png?v=17" alt="Aurora" style="width:120px;height:70px;object-fit:contain;display:block;margin-bottom:8px"><b>Aurora</b><span>Gestão da Direção 2027</span></div>')
+          s=s.replace('./branding-v15.js?v=15','./branding-v15.js?v=17')
+          p.write_text(s,encoding='utf-8')
+          PY
+      - name: Publicar correção
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add aurora-gestao-2027/index.html
+          git commit -m 'Corrige loop de atualização e fixa logo Aurora v17'
+          git push
