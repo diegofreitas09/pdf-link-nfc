@@ -1,0 +1,36 @@
+name: Aurora Logo v20
+on:
+  push:
+    paths:
+      - '.github/workflows/aurora-logo-v20.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Atualizar referência da logo oficial
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('aurora-gestao-2027/index.html')
+          s=p.read_text(encoding='utf-8')
+          s=s.replace('/aurora-logo.png?v=19','./aurora-logo.webp?v=20')
+          s=s.replace('./branding-v15.js?v=19','./branding-v15.js?v=20')
+          p.write_text(s,encoding='utf-8')
+          b=Path('aurora-gestao-2027/branding-v15.js')
+          t=b.read_text(encoding='utf-8')
+          t=t.replace("if(window.__auroraBrandingV19)return;window.__auroraBrandingV19=true;","if(window.__auroraBrandingV20)return;window.__auroraBrandingV20=true;")
+          t=t.replace("const LOGO='/aurora-logo.png?v=19';","const LOGO='./aurora-logo.webp?v=20';")
+          t=t.replace("const LOGO_FALLBACK='https://raw.githubusercontent.com/diegofreitas09/pdf-link-nfc/main/aurora-gestao-2027/aurora-logo.png';","const LOGO_FALLBACK='./aurora-logo.webp?v=20';")
+          t=t.replace('aurora19-logo','aurora20-logo').replace('aurora19-top','aurora20-top')
+          b.write_text(t,encoding='utf-8')
+          PY
+      - name: Commit
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add aurora-gestao-2027/index.html aurora-gestao-2027/branding-v15.js
+          git diff --cached --quiet || git commit -m 'Usa logo oficial Aurora em WebP v20'
+          git push
