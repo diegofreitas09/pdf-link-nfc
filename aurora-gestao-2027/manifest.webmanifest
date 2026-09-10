@@ -1,0 +1,29 @@
+{
+  "id": "./",
+  "name": "Aurora Gestão Escolar 2027",
+  "short_name": "Aurora 2027",
+  "description": "Gestão Escolar da Berçário e Creche Escola Aurora — Secretaria, Financeiro, Gestão e Relatórios.",
+  "lang": "pt-BR",
+  "start_url": "./?app=pwa",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone"],
+  "orientation": "any",
+  "background_color": "#0b1f36",
+  "theme_color": "#0b1f36",
+  "categories": ["education", "business", "productivity"],
+  "icons": [
+    {
+      "src": "./aurora-logo.webp?v=23",
+      "type": "image/webp",
+      "sizes": "512x512",
+      "purpose": "any"
+    },
+    {
+      "src": "./aurora-logo.webp?v=23",
+      "type": "image/webp",
+      "sizes": "512x512",
+      "purpose": "maskable"
+    }
+  ]
+}
