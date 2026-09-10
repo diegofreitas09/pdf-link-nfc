@@ -1,6 +1,6 @@
 (()=>{
 if(window.__auroraBrandingV17)return;window.__auroraBrandingV17=true;
-const LOGO='./aurora-logo.png?v=17';
+const LOGO='./aurora-logo.png?v=18';
 const WA='https://wa.me/5585984161882';
 const style=document.createElement('style');style.textContent=`
 .aurora17-logo{display:block;object-fit:contain}.mark{width:128px!important;height:90px!important;border-radius:18px!important;background:#fff!important;padding:6px!important}.mark .aurora17-logo{width:100%;height:100%}.brand{padding-top:2px!important}.brand .aurora17-logo{width:132px;height:76px;margin:0 0 8px 0;filter:drop-shadow(0 5px 14px #0003)}.aurora17-top{width:138px;height:76px;object-fit:contain;margin:0 0 10px 0;display:block}.dev-credit{margin-top:24px;padding:13px 12px;border-top:1px solid #ffffff22;color:#9eb2c5;font-size:10px;line-height:1.45}.dev-credit span{display:block;color:#7890a6;font-size:9px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px}.dev-credit a{color:#fff;text-decoration:none;font-weight:800}.dev-credit a:hover{text-decoration:underline}.main-dev-credit{margin:30px 0 4px;padding:15px 0 2px;border-top:1px solid var(--l);font-size:10px;color:var(--m);text-align:center}.main-dev-credit a{color:var(--t);font-weight:800;text-decoration:none}.main-dev-credit a:hover{text-decoration:underline}
