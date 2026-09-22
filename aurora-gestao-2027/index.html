@@ -52,7 +52,7 @@ const API='https://oyuprxoqhhnpcnxgaokj.supabase.co/functions/v1/aurora-direcao-
 let P='',S=null,V=0,timer=null,busy=false,pending=false,active='dash';
 const $=s=>document.querySelector(s),n=v=>v===null||v===undefined||v===''||isNaN(Number(v))?null:Number(v),brl=v=>n(v)===null?'—':Number(v).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}),pct=v=>n(v)===null?'—':(Number(v)*100).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})+'%',esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const uniq=a=>[...new Set(a.filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
-const TURNOS=['Manhã','Tarde','Regular','Semi integral','Integral','Integral estendido','Personalizado'];
+const TURNOS=['Manhã','Tarde','Regular','Semi integral','Semi estendido','Integral','Integral estendido','Personalizado'];
 async function api(action,x={}){let r=await fetch(API,{method:'POST',headers:{'content-type':'application/json','x-aurora-password':P},body:JSON.stringify({action,...x}),cache:'no-store'}),d={};try{d=await r.json()}catch{}if(!r.ok){let e=new Error(d.error||r.status);e.status=r.status;throw e}return d}
 function toast(m,bad=false){let e=$('#toast');e.textContent=m;e.className=bad?'bad':'';e.style.display='block';clearTimeout(e.t);e.t=setTimeout(()=>e.style.display='none',2300)}
 function syn(m,t){$('#dot').className='dot '+(m||'');$('#sync').textContent=t;$('#ver').textContent='versão '+V}
@@ -92,7 +92,7 @@ $('#form').onsubmit=async e=>{e.preventDefault();let b=$('#enter');b.disabled=tr
 <script src="./secretaria-v7.js?v=7"></script>
 <script src="./financeiro-cadastro-v8.js?v=8"></script>
 <script src="./veterano-logo-v9.js?v=9"></script>
-<script src="./fechamento-v10.js?v=10"></script>
+<script src="./fechamento-v10.js?v=24"></script>
 <script src="./fechamento-clean-v11.js?v=11"></script>
 <script src="./veterano-busca-v11.js?v=11"></script>
 <script src="./dashboard-v14.js?v=14"></script>
