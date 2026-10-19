@@ -152,3 +152,64 @@
   .address-box{gap:10px;padding:12px}.address-icon{width:41px;height:41px;min-width:41px}
 }
 @media(prefers-reduced-motion:reduce){.quick-action,.link-card{transition:none}}
+
+
+/* Animacao flow: estrelas preenchidas uma a uma ate cinco, com pausa e reinicio. */
+.plaque-stars{
+  display:flex;justify-content:center;align-items:center;
+  gap:clamp(5px,1.8vw,11px);width:100%;min-height:44px;
+  margin:2px auto 1px;
+}
+.plaque-star{display:grid;place-items:center;flex:none;width:clamp(30px,9vw,40px);height:42px}
+.plaque-star svg{
+  width:100%;height:100%;display:block;
+  stroke:#f9cb73;stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round;
+  fill:transparent;
+  transform-origin:center;
+  will-change:transform,fill;
+}
+
+.plaque-star:nth-child(1) svg{animation:pdfStarFlow1 6.5s ease-in-out infinite}
+@keyframes pdfStarFlow1{
+  0%,7%{fill:transparent;stroke:#ffcf83;transform:scale(1);filter:drop-shadow(0 0 0 transparent)}
+  14%{fill:#ffd04e;stroke:#ffe4a0;transform:scale(1.18);filter:drop-shadow(0 0 7px rgba(255,192,47,.78))}
+  19%,86%{fill:#ffcf48;stroke:#ffe59b;transform:scale(1.02);filter:drop-shadow(0 0 3px rgba(255,191,45,.4))}
+  96%,100%{fill:transparent;stroke:#ffcf83;transform:scale(1);filter:drop-shadow(0 0 0 transparent)}
+}
+
+.plaque-star:nth-child(2) svg{animation:pdfStarFlow2 6.5s ease-in-out infinite}
+@keyframes pdfStarFlow2{
+  0%,18%{fill:transparent;stroke:#ffcf83;transform:scale(1);filter:drop-shadow(0 0 0 transparent)}
+  25%{fill:#ffd04e;stroke:#ffe4a0;transform:scale(1.18);filter:drop-shadow(0 0 7px rgba(255,192,47,.78))}
+  30%,86%{fill:#ffcf48;stroke:#ffe59b;transform:scale(1.02);filter:drop-shadow(0 0 3px rgba(255,191,45,.4))}
+  96%,100%{fill:transparent;stroke:#ffcf83;transform:scale(1);filter:drop-shadow(0 0 0 transparent)}
+}
+
+.plaque-star:nth-child(3) svg{animation:pdfStarFlow3 6.5s ease-in-out infinite}
+@keyframes pdfStarFlow3{
+  0%,29%{fill:transparent;stroke:#ffcf83;transform:scale(1);filter:drop-shadow(0 0 0 transparent)}
+  36%{fill:#ffd04e;stroke:#ffe4a0;transform:scale(1.18);filter:drop-shadow(0 0 7px rgba(255,192,47,.78))}
+  41%,86%{fill:#ffcf48;stroke:#ffe59b;transform:scale(1.02);filter:drop-shadow(0 0 3px rgba(255,191,45,.4))}
+  96%,100%{fill:transparent;stroke:#ffcf83;transform:scale(1);filter:drop-shadow(0 0 0 transparent)}
+}
+
+.plaque-star:nth-child(4) svg{animation:pdfStarFlow4 6.5s ease-in-out infinite}
+@keyframes pdfStarFlow4{
+  0%,40%{fill:transparent;stroke:#ffcf83;transform:scale(1);filter:drop-shadow(0 0 0 transparent)}
+  47%{fill:#ffd04e;stroke:#ffe4a0;transform:scale(1.18);filter:drop-shadow(0 0 7px rgba(255,192,47,.78))}
+  52%,86%{fill:#ffcf48;stroke:#ffe59b;transform:scale(1.02);filter:drop-shadow(0 0 3px rgba(255,191,45,.4))}
+  96%,100%{fill:transparent;stroke:#ffcf83;transform:scale(1);filter:drop-shadow(0 0 0 transparent)}
+}
+
+.plaque-star:nth-child(5) svg{animation:pdfStarFlow5 6.5s ease-in-out infinite}
+@keyframes pdfStarFlow5{
+  0%,51%{fill:transparent;stroke:#ffcf83;transform:scale(1);filter:drop-shadow(0 0 0 transparent)}
+  58%{fill:#ffd04e;stroke:#ffe4a0;transform:scale(1.18);filter:drop-shadow(0 0 7px rgba(255,192,47,.78))}
+  63%,86%{fill:#ffcf48;stroke:#ffe59b;transform:scale(1.02);filter:drop-shadow(0 0 3px rgba(255,191,45,.4))}
+  96%,100%{fill:transparent;stroke:#ffcf83;transform:scale(1);filter:drop-shadow(0 0 0 transparent)}
+}
+
+@media(max-width:380px){.plaque-stars{gap:4px;min-height:37px}.plaque-star{width:31px;height:35px}}
+@media(prefers-reduced-motion:reduce){
+ .plaque-star svg{animation:none!important;fill:#ffcf48;stroke:#ffe59b;filter:none;transform:none;will-change:auto}
+}
