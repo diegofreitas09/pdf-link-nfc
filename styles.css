@@ -53,3 +53,102 @@
 .plaque-cta-arrow .external-icon{width:20px;height:20px;stroke-width:2.55}
 .quick-action:focus-visible,.link-card:focus-visible{outline:2px solid #f8cd71;outline-offset:3px}
 @media(max-width:380px){.quick-action{min-height:73px;gap:7px}.link-card{grid-template-columns:46px minmax(0,1fr) 16px;gap:10px}.icon-bubble{width:46px;height:46px;border-radius:14px}.icon-bubble .brand-icon{width:27px;height:27px}.quick-icon .ui-icon{width:25px;height:25px}}
+
+
+/* PDF NFC · refinamento premium dos ícones e cartões · outubro/2026 */
+.quick-actions{gap:11px;margin:8px 0 21px}
+.quick-action{
+  position:relative;isolation:isolate;overflow:hidden;
+  min-height:114px;padding:13px 5px 12px;gap:10px;
+  border:1px solid rgba(218,159,64,.48);border-radius:21px;
+  background:linear-gradient(148deg,#281c18 0%,#17100f 55%,#0d0c0c 100%);
+  box-shadow:inset 0 1px 0 rgba(255,225,169,.12),inset 0 -1px 0 rgba(184,111,22,.16),0 8px 18px rgba(0,0,0,.22);
+  font-weight:750;letter-spacing:-.015em;
+}
+.quick-action::before{
+  content:"";position:absolute;inset:0 0 auto;height:34%;
+  background:linear-gradient(180deg,rgba(255,221,163,.065),transparent);pointer-events:none;z-index:-1
+}
+.quick-action:hover,.quick-action:focus-visible{
+  background:linear-gradient(148deg,#32221b,#1b1110);border-color:#f2c86d;
+  box-shadow:inset 0 1px 0 rgba(255,231,185,.2),0 12px 24px rgba(0,0,0,.25)
+}
+.quick-icon{
+  width:56px;height:56px;flex:0 0 56px;border-radius:50%;display:grid;place-items:center;
+  color:#ffcd68;border:1.5px solid #dba94d;
+  background:radial-gradient(circle at 30% 20%,#2c2117 0%,#110d0a 70%);
+  box-shadow:inset 0 1px 0 rgba(255,233,177,.1),0 3px 10px rgba(0,0,0,.32),0 0 0 3px rgba(201,127,35,.055)
+}
+.quick-icon .ui-icon{width:29px;height:29px;stroke-width:2.35;filter:drop-shadow(0 3px 5px rgba(232,150,27,.16))}
+.quick-action>span:last-child{font-size:clamp(.7rem,2.5vw,.88rem);line-height:1.15}
+.links-list{gap:12px}
+.link-card{
+  min-height:83px;grid-template-columns:54px minmax(0,1fr) 20px;
+  gap:13px;padding:13px 15px;border-radius:20px;
+  background:linear-gradient(145deg,#232020 0%,#151414 65%,#101010 100%);
+  border:1px solid rgba(202,184,164,.17);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 7px 16px rgba(0,0,0,.13)
+}
+.link-card:hover,.link-card:focus-visible{border-color:rgba(242,194,99,.63);background:linear-gradient(145deg,#282322,#171413)}
+.link-card.primary{
+  background:linear-gradient(120deg,#075c36 0%,#074328 46%,#082b1e 100%);
+  border-color:rgba(56,233,120,.55);
+  box-shadow:inset 0 1px 0 rgba(184,255,207,.14),0 8px 18px rgba(0,0,0,.18)
+}
+.icon-bubble{
+  width:54px;height:54px;border-radius:17px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 4px 10px rgba(0,0,0,.18)
+}
+.icon-bubble .brand-icon{width:32px;height:32px}
+.icon-bubble.whatsapp{
+  background:radial-gradient(circle at 27% 16%,#2cec85 0%,#05ac5c 40%,#007c40 100%);
+  color:#fff;border:1px solid #39ed94;
+  box-shadow:inset 0 1px 2px rgba(255,255,255,.28),0 0 15px rgba(0,221,100,.17)
+}
+.icon-bubble.whatsapp .brand-icon{width:36px;height:36px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.28))}
+.icon-bubble.instagram{
+  background:linear-gradient(30deg,#ffd66c 0%,#fc8a35 17%,#ed2c75 47%,#b429ac 72%,#5638ca 100%);
+  border:1px solid rgba(255,255,255,.25);color:white
+}
+.icon-bubble.instagram .brand-icon{width:34px;height:34px;stroke-width:1.8}
+.icon-bubble.maps{
+  background:linear-gradient(145deg,#fff 0%,#edf2f7 100%);
+  border:1px solid rgba(255,255,255,.65)
+}
+.icon-bubble.maps .brand-icon{width:37px;height:37px}
+.link-copy strong{font-size:1.03rem;letter-spacing:-.01em}
+.link-copy small{font-size:.82rem;color:#c4c0c0;line-height:1.32}
+.arrow{color:#d1cece}
+.arrow .chevron-icon{width:23px;height:23px;stroke-width:2.5}
+.address-box{
+  align-items:center;gap:13px;margin-top:19px;min-height:84px;padding:14px 15px;
+  background:linear-gradient(145deg,#1e1b1b,#111010);
+  border:1px solid rgba(202,184,164,.16);border-radius:19px
+}
+.address-icon{
+  flex:none;min-width:45px;width:45px;height:45px;
+  display:grid;place-items:center;border-radius:50%;
+  border:1px solid #c99842;color:#f8c665;
+  background:radial-gradient(circle at top,#2e2117,#13100d);
+  box-shadow:inset 0 1px 0 rgba(255,230,163,.13)
+}
+.address-icon .ui-icon{width:25px;height:25px;stroke-width:1.9}
+.address-box strong{font-size:.97rem}
+.address-box p{font-size:.81rem;color:#c3bebe}
+.review-plaque{border-color:#e3a73e;box-shadow:inset 0 1px 0 rgba(255,227,170,.23),0 10px 28px rgba(0,0,0,.29)}
+.plaque-cta{background:linear-gradient(180deg,#ffebaf,#ffc751 76%,#efab2c);border:1px solid rgba(255,242,195,.72)}
+@media(max-width:380px){
+  .quick-actions{gap:8px}
+  .quick-action{min-height:103px;padding:11px 3px;gap:8px;border-radius:18px}
+  .quick-icon{width:49px;height:49px;flex-basis:49px}
+  .quick-icon .ui-icon{width:26px;height:26px}
+  .quick-action>span:last-child{font-size:.7rem}
+  .link-card{grid-template-columns:46px minmax(0,1fr) 17px;gap:10px;padding:12px;min-height:74px}
+  .icon-bubble{width:46px;height:46px;border-radius:14px}
+  .icon-bubble.whatsapp .brand-icon{width:32px;height:32px}
+  .icon-bubble.instagram .brand-icon{width:29px;height:29px}
+  .icon-bubble.maps .brand-icon{width:33px;height:33px}
+  .link-copy strong{font-size:.93rem}.link-copy small{font-size:.72rem}
+  .address-box{gap:10px;padding:12px}.address-icon{width:41px;height:41px;min-width:41px}
+}
+@media(prefers-reduced-motion:reduce){.quick-action,.link-card{transition:none}}
