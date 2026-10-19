@@ -31,3 +31,25 @@
 .plaque-footnote{font-size:.67rem;color:#dfbaa8;line-height:1.25}
 @media(max-width:380px){.review-plaque{padding:15px 9px}.plaque-mini-logo{width:64px;height:63px}.plaque-hero{gap:6px}.plaque-title{font-size:1.3rem}.plaque-title-google{font-size:1.05rem}.plaque-stars{font-size:1.25rem;letter-spacing:0}}
 @media(prefers-reduced-motion:reduce){.review-plaque{transition:none}}
+
+/* Ícones vetoriais profissionais — carregamento local, sem bibliotecas externas. */
+.quick-action{min-height:78px;gap:8px;border-radius:17px;background:linear-gradient(160deg,rgba(255,255,255,.082),rgba(255,255,255,.032));border-color:rgba(246,211,143,.12)}
+.quick-icon{display:grid;place-items:center;height:29px;width:29px;color:#f6c962}
+.quick-icon .ui-icon{height:27px;width:27px;stroke-width:2.1;filter:drop-shadow(0 2px 7px rgba(255,194,78,.13))}
+.link-card{grid-template-columns:52px minmax(0,1fr) 20px;gap:13px;min-height:78px}
+.icon-bubble{width:52px;height:52px;border-radius:16px;box-shadow:inset 0 1px 0 rgba(255,255,255,.10);overflow:hidden}
+.icon-bubble .brand-icon{width:29px;height:29px;display:block}
+.icon-bubble.whatsapp{background:linear-gradient(145deg,#087743,#053b26);border-color:rgba(99,224,152,.22);color:#fff}
+.icon-bubble.whatsapp .brand-icon{width:31px;height:31px}
+.icon-bubble.instagram{background:linear-gradient(35deg,#ffcd55,#ef4e6c 42%,#b729a6 68%,#5832ba);border-color:rgba(255,255,255,.18);color:#fff}
+.icon-bubble.instagram .brand-icon{width:29px;height:29px}
+.icon-bubble.maps{background:linear-gradient(145deg,#163858,#0d1a2b);border-color:rgba(100,161,224,.21)}
+.icon-bubble.maps .brand-icon{width:30px;height:30px}
+.arrow{display:grid;place-items:center;color:#a3a3a3}
+.arrow .chevron-icon{height:21px;width:21px;stroke-width:2.25}
+.address-icon{display:grid;place-items:start center;min-width:23px;color:#f5c866}
+.address-icon .ui-icon{width:22px;height:22px;stroke-width:2.1}
+.plaque-cta-arrow{display:inline-flex;align-items:center;justify-content:center}
+.plaque-cta-arrow .external-icon{width:20px;height:20px;stroke-width:2.55}
+.quick-action:focus-visible,.link-card:focus-visible{outline:2px solid #f8cd71;outline-offset:3px}
+@media(max-width:380px){.quick-action{min-height:73px;gap:7px}.link-card{grid-template-columns:46px minmax(0,1fr) 16px;gap:10px}.icon-bubble{width:46px;height:46px;border-radius:14px}.icon-bubble .brand-icon{width:27px;height:27px}.quick-icon .ui-icon{width:25px;height:25px}}
